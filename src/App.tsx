@@ -1,0 +1,508 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+  useReadContract,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useSwitchChain,
+  usePublicClient,
+} from "wagmi";
+import { formatEther, parseEther, type Address } from "viem";
+import { AdminCreateAuction } from "./AdminCreateAuction";
+import {
+  AUCTION_ABI,
+  AUCTION_ADDRESS,
+  CHAIN,
+  COLLECTION_ABI,
+  COLLECTION_ADDRESS,
+  EXPLORER,
+  arweaveToHttp,
+} from "./config";
+
+type AuctionState = {
+  id: bigint;
+  tokenURI: string;
+  startTime: bigint;
+  endTime: bigint;
+  reservePrice: bigint;
+  minBidIncrement: bigint;
+  highestBidder: Address;
+  highestBid: bigint;
+  proceedsTo: Address;
+  settled: boolean;
+  live: boolean;
+};
+
+function shortAddr(a?: string) {
+  if (!a || a === "0x0000000000000000000000000000000000000000") return "—";
+  return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+function useCountdown(endSec: number) {
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const left = Math.max(0, endSec - now);
+  const h = Math.floor(left / 3600);
+  const m = Math.floor((left % 3600) / 60);
+  const s = left % 60;
+  return {
+    left,
+    label:
+      endSec <= 0
+        ? "—"
+        : left === 0
+          ? "終了"
+          : `${h}時間 ${m}分 ${s.toString().padStart(2, "0")}秒`,
+  };
+}
+
+async function resolveArtUrl(
+  tokenURI: string,
+  publicClient: ReturnType<typeof usePublicClient>
+): Promise<string> {
+  if (!tokenURI) return "";
+  const http = arweaveToHttp(tokenURI);
+  // try fetch JSON metadata
+  try {
+    const res = await fetch(http);
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("json") || tokenURI.includes("metadata") || http.endsWith(".json")) {
+      const j = await res.json();
+      const img = j.image || j.image_url || j.animation_url;
+      if (typeof img === "string") return arweaveToHttp(img);
+    }
+    // if image bytes
+    if (ct.startsWith("image/")) return http;
+  } catch {
+    /* placeholder */
+  }
+  void publicClient;
+  return http;
+}
+
+export default function App() {
+  const { address, isConnected, chainId } = useAccount();
+  const { connect, connectors, isPending: connecting } = useConnect();
+  const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient();
+
+  const { data: stateRaw, refetch: refetchState, isError: stateErr, error: stateError } =
+    useReadContract({
+      address: AUCTION_ADDRESS,
+      abi: AUCTION_ABI,
+      functionName: "auctionState",
+      chainId: CHAIN.id,
+      query: { refetchInterval: 8_000 },
+    });
+
+  const { data: totalMinted } = useReadContract({
+    address: COLLECTION_ADDRESS,
+    abi: COLLECTION_ABI,
+    functionName: "totalMinted",
+    chainId: CHAIN.id,
+    query: { refetchInterval: 15_000 },
+  });
+
+  const { data: pending } = useReadContract({
+    address: AUCTION_ADDRESS,
+    abi: AUCTION_ABI,
+    functionName: "pendingReturns",
+    args: address ? [address] : undefined,
+    chainId: CHAIN.id,
+    query: { enabled: !!address, refetchInterval: 10_000 },
+  });
+
+  const state: AuctionState | null = useMemo(() => {
+    if (!stateRaw || !Array.isArray(stateRaw)) return null;
+    const [
+      id,
+      tokenURI,
+      startTime,
+      endTime,
+      reservePrice,
+      minBidIncrement,
+      highestBidder,
+      highestBid,
+      proceedsTo,
+      settled,
+      live,
+    ] = stateRaw as [
+      bigint,
+      string,
+      bigint,
+      bigint,
+      bigint,
+      bigint,
+      Address,
+      bigint,
+      Address,
+      boolean,
+      boolean,
+    ];
+    return {
+      id,
+      tokenURI,
+      startTime,
+      endTime,
+      reservePrice,
+      minBidIncrement,
+      highestBidder,
+      highestBid,
+      proceedsTo,
+      settled,
+      live,
+    };
+  }, [stateRaw]);
+
+  const endSec = state ? Number(state.endTime) : 0;
+  const { left, label: countdown } = useCountdown(endSec);
+
+  const [artUrl, setArtUrl] = useState("");
+  const [artBroken, setArtBroken] = useState(false);
+  const [bidInput, setBidInput] = useState("");
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      if (!state?.tokenURI) {
+        setArtUrl("");
+        return;
+      }
+      setArtBroken(false);
+      const url = await resolveArtUrl(state.tokenURI, publicClient);
+      if (!cancel) setArtUrl(url);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [state?.tokenURI, publicClient]);
+
+  const minNextBid = useMemo(() => {
+    if (!state) return 0n;
+    if (state.highestBid === 0n) {
+      return state.reservePrice > 0n ? state.reservePrice : state.minBidIncrement;
+    }
+    return state.highestBid + state.minBidIncrement;
+  }, [state]);
+
+  useEffect(() => {
+    if (minNextBid > 0n) {
+      setBidInput(formatEther(minNextBid));
+    }
+  }, [minNextBid]);
+
+  const { writeContract, data: txHash, isPending: writing, reset: resetWrite } =
+    useWriteContract();
+  const { isLoading: confirming, isSuccess: confirmed } =
+    useWaitForTransactionReceipt({ hash: txHash });
+
+  useEffect(() => {
+    if (confirmed) {
+      setStatus("トランザクション確認済み");
+      refetchState();
+      resetWrite();
+    }
+  }, [confirmed, refetchState, resetWrite]);
+
+  const ensureChain = useCallback(async () => {
+    if (chainId !== CHAIN.id) {
+      switchChain?.({ chainId: CHAIN.id });
+      throw new Error("Base Sepolia に切り替えてください");
+    }
+  }, [chainId, switchChain]);
+
+  const onBid = async () => {
+    try {
+      setStatus(null);
+      await ensureChain();
+      if (!state?.live) {
+        setStatus("現在入札できません（終了または未開始）");
+        return;
+      }
+      const value = parseEther(bidInput || "0");
+      if (value < minNextBid) {
+        setStatus(`最低入札額は ${formatEther(minNextBid)} ETH です`);
+        return;
+      }
+      writeContract({
+        address: AUCTION_ADDRESS,
+        abi: AUCTION_ABI,
+        functionName: "bid",
+        args: [],
+        value,
+        chainId: CHAIN.id,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+      setStatus("入札を送信中…");
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "入札エラー");
+    }
+  };
+
+  const onSettle = async () => {
+    try {
+      setStatus(null);
+      await ensureChain();
+      writeContract({
+        address: AUCTION_ADDRESS,
+        abi: AUCTION_ABI,
+        functionName: "settle",
+        chainId: CHAIN.id,
+      });
+      setStatus("settle 送信中…");
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "settle エラー");
+    }
+  };
+
+  const onWithdraw = async () => {
+    try {
+      setStatus(null);
+      await ensureChain();
+      writeContract({
+        address: AUCTION_ADDRESS,
+        abi: AUCTION_ABI,
+        functionName: "withdraw",
+        chainId: CHAIN.id,
+      });
+      setStatus("出金送信中…");
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "出金エラー");
+    }
+  };
+
+  const title =
+    state && state.id > 0n ? `Bushi #${state.id.toString()}` : "Bushi Collection";
+  const canSettle = state && !state.live && !state.settled && state.startTime > 0n;
+  const showBid = state?.live;
+  const pendingAmt = (pending as bigint | undefined) ?? 0n;
+  // New lot only when none active (never started or already settled)
+  const canCreateAuction =
+    !state || state.startTime === 0n || state.settled === true;
+
+  return (
+    <div className="page">
+      <header className="top">
+        <div className="brand">
+          <span className="logo">武</span>
+          <div>
+            <div className="brand-name">Bushi Collection</div>
+            <div className="brand-sub">Base Sepolia · English Auction</div>
+          </div>
+        </div>
+        <nav className="nav">
+          <a
+            href={`${EXPLORER}/address/${COLLECTION_ADDRESS}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Collection
+          </a>
+          <a
+            href={`${EXPLORER}/address/${AUCTION_ADDRESS}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Auction
+          </a>
+          {!isConnected ? (
+            <button
+              className="btn primary"
+              disabled={connecting}
+              onClick={() => connect({ connector: connectors[0] })}
+            >
+              {connecting ? "…" : "接続する"}
+            </button>
+          ) : (
+            <button className="btn ghost" onClick={() => disconnect()}>
+              {shortAddr(address)}
+            </button>
+          )}
+        </nav>
+      </header>
+
+      <main className="hero">
+        <section className="art-panel">
+          {artUrl && !artBroken ? (
+            <img
+              src={artUrl}
+              alt={title}
+              className="art"
+              onError={() => setArtBroken(true)}
+            />
+          ) : (
+            <div className="art placeholder">
+              <div className="ph-mark">武</div>
+              <p>
+                {state?.tokenURI
+                  ? "メタデータ画像を読み込み中 / プレースホルダ"
+                  : "オークション待機中"}
+              </p>
+              {state?.tokenURI && (
+                <a href={arweaveToHttp(state.tokenURI)} target="_blank" rel="noreferrer">
+                  URI を開く
+                </a>
+              )}
+            </div>
+          )}
+        </section>
+
+        <section className="side">
+          <p className="eyebrow">
+            {state?.live
+              ? "ライブオークション"
+              : state?.settled
+                ? "落札済み"
+                : state && state.startTime > 0n
+                  ? "終了 — settle 待ち"
+                  : "準備中"}
+          </p>
+          <h1>{title}</h1>
+
+          <div className="stat-block">
+            <div className="stat-label">現在の入札額</div>
+            <div className="stat-value">
+              Ξ {state ? formatEther(state.highestBid) : "—"}
+            </div>
+            <div className="stat-meta">
+              最高入札者 {shortAddr(state?.highestBidder)}
+              {state && state.minBidIncrement > 0n && (
+                <> · 最小単位 {formatEther(state.minBidIncrement)} ETH</>
+              )}
+            </div>
+          </div>
+
+          <div className="stat-block">
+            <div className="stat-label">
+              {state?.live
+                ? "オークション終了まで"
+                : state?.settled
+                  ? "ステータス"
+                  : "カウントダウン"}
+            </div>
+            <div className="stat-value countdown">
+              {state?.settled ? "Settled" : countdown}
+            </div>
+          </div>
+
+          {showBid && (
+            <div className="bid-row">
+              <div className="bid-input-wrap">
+                <span className="eth">Ξ</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={bidInput}
+                  onChange={(e) => setBidInput(e.target.value)}
+                  aria-label="入札額 ETH"
+                />
+              </div>
+              <button
+                className="btn primary wide"
+                disabled={!isConnected || writing || confirming}
+                onClick={onBid}
+              >
+                {writing || confirming ? "処理中…" : "入札する"}
+              </button>
+            </div>
+          )}
+
+          {canSettle && (
+            <button
+              className="btn accent wide"
+              disabled={!isConnected || writing || confirming}
+              onClick={onSettle}
+            >
+              {left === 0 || !state?.live ? "settle（ミント実行）" : "settle"}
+            </button>
+          )}
+
+          {pendingAmt > 0n && (
+            <button
+              className="btn ghost wide"
+              disabled={!isConnected || writing}
+              onClick={onWithdraw}
+            >
+              返金を引き出す · {formatEther(pendingAmt)} ETH
+            </button>
+          )}
+
+          {chainId && chainId !== CHAIN.id && isConnected && (
+            <button
+              className="btn warn wide"
+              onClick={() => switchChain?.({ chainId: CHAIN.id })}
+            >
+              Base Sepolia に切替
+            </button>
+          )}
+
+          {status && <p className="status">{status}</p>}
+          {stateErr && (
+            <p className="status err">
+              読み込みエラー: {String(stateError?.message || stateErr)}
+            </p>
+          )}
+          {txHash && (
+            <p className="status">
+              <a href={`${EXPLORER}/tx/${txHash}`} target="_blank" rel="noreferrer">
+                Tx {txHash.slice(0, 10)}…
+              </a>
+            </p>
+          )}
+
+          <dl className="details">
+            <div>
+              <dt>minted</dt>
+              <dd>{totalMinted != null ? String(totalMinted) : "—"} / 12</dd>
+            </div>
+            <div>
+              <dt>reserve</dt>
+              <dd>{state ? formatEther(state.reservePrice) : "—"} ETH</dd>
+            </div>
+            <div>
+              <dt>proceeds</dt>
+              <dd>{shortAddr(state?.proceedsTo)}</dd>
+            </div>
+          </dl>
+        </section>
+      </main>
+
+      <AdminCreateAuction
+        canCreate={canCreateAuction}
+        onCreated={() => {
+          refetchState();
+        }}
+      />
+
+      <section className="about">
+        <h2>これはなに？</h2>
+        <p>
+          <strong>Bushi Collection</strong> は Base 上の English
+          オークションです。1点ずつ出品され、最高入札者が settle 後に NFT
+          を受け取ります。売上はアーティストへ 100%（ロット作成時に固定）。
+        </p>
+        <details>
+          <summary>まとめ</summary>
+          <ul>
+            <li>入札は誰でも可能（Gi 不要）</li>
+            <li>標準期間 3 日 · 終了間際は 15 分延長（アンチスナイプ）</li>
+            <li>更新入札で前の入札者は <code>withdraw</code> で返金</li>
+            <li>終了後、誰でも <code>settle</code> 可能 → ミント + 支払い</li>
+          </ul>
+        </details>
+      </section>
+
+      <footer className="foot">
+        <span>Proof of Gi · BushiDAO</span>
+        <span>Chain ID {CHAIN.id}</span>
+      </footer>
+    </div>
+  );
+}
