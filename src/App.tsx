@@ -69,6 +69,47 @@ type NftMeta = {
   attributes?: NftAttr[];
 };
 
+const HAS_JA = /[\u3040-\u30ff\u3400-\u9fff]/;
+
+/** Prefer JP block only in collapsed view; EN behind もっと見る. */
+function splitDescription(desc: string): { preview: string; hasMore: boolean } {
+  const t = desc.trim();
+  if (!t) return { preview: "", hasMore: false };
+
+  const blocks = t.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  if (blocks.length >= 2 && HAS_JA.test(blocks[0])) {
+    // JP first paragraph only
+    return { preview: blocks[0], hasMore: true };
+  }
+
+  // Mixed single block: keep lines until first mostly-English line after JA
+  const lines = t.split("\n");
+  const jaLines: string[] = [];
+  let sawJa = false;
+  for (const line of lines) {
+    const l = line.trim();
+    if (!l) {
+      if (sawJa && jaLines.length) break;
+      continue;
+    }
+    if (HAS_JA.test(l)) {
+      sawJa = true;
+      jaLines.push(l);
+    } else if (sawJa) {
+      break; // hit English after Japanese
+    } else {
+      jaLines.push(l);
+    }
+  }
+  if (sawJa && jaLines.length && jaLines.join("\n").length < t.length) {
+    return { preview: jaLines.join("\n"), hasMore: true };
+  }
+
+  // Short enough already
+  if (t.length <= 140) return { preview: t, hasMore: false };
+  return { preview: `${t.slice(0, 140).trim()}…`, hasMore: true };
+}
+
 async function loadMetadata(tokenURI: string): Promise<{ meta: NftMeta; imageUrl: string }> {
   if (!tokenURI) return { meta: {}, imageUrl: "" };
   const http = arweaveToHttp(tokenURI);
@@ -304,15 +345,28 @@ export default function App() {
     (a) => a && (a.trait_type || a.value !== undefined)
   );
   const desc = (meta.description || "").trim();
-  const descLong = desc.length > 220;
-  const descShown =
-    desc && !descOpen && descLong ? `${desc.slice(0, 220).trim()}…` : desc;
+  const { preview: descPreview, hasMore: descHasMore } = useMemo(
+    () => splitDescription(desc),
+    [desc]
+  );
+  const descShown = descOpen ? desc : descPreview;
   const canSettle = state && !state.live && !state.settled && state.startTime > 0n;
   const showBid = state?.live;
   const pendingAmt = (pending as bigint | undefined) ?? 0n;
   // New lot only when none active (never started or already settled)
   const canCreateAuction =
     !state || state.startTime === 0n || state.settled === true;
+
+  const TraitsGrid = attrs.length > 0 && (
+    <div className="traits" aria-label="プロパティ">
+      {attrs.map((a, i) => (
+        <div className="trait" key={`${a.trait_type}-${i}`}>
+          <span className="trait-type">{a.trait_type || "Trait"}</span>
+          <span className="trait-value">{String(a.value ?? "—")}</span>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className="page">
@@ -381,6 +435,14 @@ export default function App() {
           )}
         </section>
 
+        {/* Mobile: properties under artwork */}
+        {attrs.length > 0 && (
+          <details className="props-acc props-mobile">
+            <summary>プロパティ</summary>
+            {TraitsGrid}
+          </details>
+        )}
+
         <section className="side">
           <p className="eyebrow">
             {state?.live
@@ -397,7 +459,7 @@ export default function App() {
           {desc && (
             <div className="meta-desc">
               <p className="meta-desc-text">{descShown}</p>
-              {descLong && (
+              {descHasMore && (
                 <button
                   type="button"
                   className="linkish"
@@ -409,17 +471,6 @@ export default function App() {
             </div>
           )}
 
-          {attrs.length > 0 && (
-            <div className="traits" aria-label="Attributes">
-              {attrs.map((a, i) => (
-                <div className="trait" key={`${a.trait_type}-${i}`}>
-                  <span className="trait-type">{a.trait_type || "Trait"}</span>
-                  <span className="trait-value">{String(a.value ?? "—")}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
           <div className="stat-block">
             <div className="stat-label">現在の入札額</div>
             <div className="stat-value">
@@ -427,9 +478,6 @@ export default function App() {
             </div>
             <div className="stat-meta">
               最高入札者 {shortAddr(state?.highestBidder)}
-              {state && state.minBidIncrement > 0n && (
-                <> · 最小単位 {formatEther(state.minBidIncrement)} ETH</>
-              )}
             </div>
           </div>
 
@@ -448,6 +496,15 @@ export default function App() {
 
           {showBid && (
             <div className="bid-row">
+              <div className="bid-head">
+                <span className="bid-label">入札額</span>
+                <span className="bid-hint">
+                  最低 {formatEther(minNextBid)} ETH
+                  {state && state.minBidIncrement > 0n && (
+                    <> · 刻み {formatEther(state.minBidIncrement)} ETH</>
+                  )}
+                </span>
+              </div>
               <div className="bid-input-wrap">
                 <span className="eth">Ξ</span>
                 <input
@@ -456,6 +513,7 @@ export default function App() {
                   value={bidInput}
                   onChange={(e) => setBidInput(e.target.value)}
                   aria-label="入札額 ETH"
+                  placeholder={formatEther(minNextBid)}
                 />
               </div>
               <button
@@ -466,6 +524,14 @@ export default function App() {
                 {writing || confirming ? "処理中…" : "入札する"}
               </button>
             </div>
+          )}
+
+          {/* Desktop: properties accordion in side rail */}
+          {attrs.length > 0 && (
+            <details className="props-acc props-desktop">
+              <summary>プロパティ</summary>
+              {TraitsGrid}
+            </details>
           )}
 
           {canSettle && (
