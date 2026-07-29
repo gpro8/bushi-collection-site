@@ -71,7 +71,8 @@ Current default `base: "./"` is relative and usually works for project Pages.
 
 ## Backlog (UI)
 
-- [ ] Show metadata **description** (and name/attrs) on auction page — polish with UX pass
+- [x] Show metadata **name / description / attributes** (OpenSea-style, compact)
+- [ ] Further UX polish (history strip, JP/EN toggle, etc.)
 
 ## Owner
 

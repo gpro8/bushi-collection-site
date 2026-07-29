@@ -7,7 +7,6 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
   useSwitchChain,
-  usePublicClient,
 } from "wagmi";
 import { formatEther, parseEther, type Address } from "viem";
 import { AdminCreateAuction } from "./AdminCreateAuction";
@@ -61,28 +60,40 @@ function useCountdown(endSec: number) {
   };
 }
 
-async function resolveArtUrl(
-  tokenURI: string,
-  publicClient: ReturnType<typeof usePublicClient>
-): Promise<string> {
-  if (!tokenURI) return "";
+type NftAttr = { trait_type?: string; value?: string | number; display_type?: string };
+
+type NftMeta = {
+  name?: string;
+  description?: string;
+  image?: string;
+  attributes?: NftAttr[];
+};
+
+async function loadMetadata(tokenURI: string): Promise<{ meta: NftMeta; imageUrl: string }> {
+  if (!tokenURI) return { meta: {}, imageUrl: "" };
   const http = arweaveToHttp(tokenURI);
-  // try fetch JSON metadata
   try {
     const res = await fetch(http);
-    const ct = res.headers.get("content-type") || "";
-    if (ct.includes("json") || tokenURI.includes("metadata") || http.endsWith(".json")) {
-      const j = await res.json();
-      const img = j.image || j.image_url || j.animation_url;
-      if (typeof img === "string") return arweaveToHttp(img);
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    const text = await res.text();
+    // JSON metadata (OpenSea-style)
+    if (
+      ct.includes("json") ||
+      tokenURI.includes("metadata") ||
+      text.trimStart().startsWith("{")
+    ) {
+      const j = JSON.parse(text) as NftMeta;
+      const img = j.image || (j as { image_url?: string }).image_url;
+      return {
+        meta: j,
+        imageUrl: typeof img === "string" ? arweaveToHttp(img) : "",
+      };
     }
-    // if image bytes
-    if (ct.startsWith("image/")) return http;
+    if (ct.startsWith("image/")) return { meta: {}, imageUrl: http };
   } catch {
-    /* placeholder */
+    /* fall through */
   }
-  void publicClient;
-  return http;
+  return { meta: {}, imageUrl: http };
 }
 
 export default function App() {
@@ -90,7 +101,6 @@ export default function App() {
   const { connect, connectors, isPending: connecting } = useConnect();
   const { disconnect } = useDisconnect();
   const { switchChain } = useSwitchChain();
-  const publicClient = usePublicClient();
 
   const { data: stateRaw, refetch: refetchState, isError: stateErr, error: stateError } =
     useReadContract({
@@ -164,6 +174,8 @@ export default function App() {
   const { left, label: countdown } = useCountdown(endSec);
 
   const [artUrl, setArtUrl] = useState("");
+  const [meta, setMeta] = useState<NftMeta>({});
+  const [descOpen, setDescOpen] = useState(false);
   const [artBroken, setArtBroken] = useState(false);
   const [bidInput, setBidInput] = useState("");
   const [status, setStatus] = useState<string | null>(null);
@@ -173,16 +185,21 @@ export default function App() {
     (async () => {
       if (!state?.tokenURI) {
         setArtUrl("");
+        setMeta({});
         return;
       }
       setArtBroken(false);
-      const url = await resolveArtUrl(state.tokenURI, publicClient);
-      if (!cancel) setArtUrl(url);
+      const { meta: m, imageUrl } = await loadMetadata(state.tokenURI);
+      if (!cancel) {
+        setMeta(m);
+        setArtUrl(imageUrl);
+        setDescOpen(false);
+      }
     })();
     return () => {
       cancel = true;
     };
-  }, [state?.tokenURI, publicClient]);
+  }, [state?.tokenURI]);
 
   const minNextBid = useMemo(() => {
     if (!state) return 0n;
@@ -279,7 +296,17 @@ export default function App() {
   };
 
   const title =
-    state && state.id > 0n ? `Bushi #${state.id.toString()}` : "Bushi Collection";
+    meta.name?.trim() ||
+    (state && state.id > 0n ? `Bushi #${state.id.toString()}` : "Bushi Collection");
+  const lotLabel =
+    state && state.id > 0n ? `Bushi Collection · #${state.id.toString()}` : null;
+  const attrs = (meta.attributes || []).filter(
+    (a) => a && (a.trait_type || a.value !== undefined)
+  );
+  const desc = (meta.description || "").trim();
+  const descLong = desc.length > 220;
+  const descShown =
+    desc && !descOpen && descLong ? `${desc.slice(0, 220).trim()}…` : desc;
   const canSettle = state && !state.live && !state.settled && state.startTime > 0n;
   const showBid = state?.live;
   const pendingAmt = (pending as bigint | undefined) ?? 0n;
@@ -364,7 +391,34 @@ export default function App() {
                   ? "終了 — settle 待ち"
                   : "準備中"}
           </p>
+          {lotLabel && <p className="lot-label">{lotLabel}</p>}
           <h1>{title}</h1>
+
+          {desc && (
+            <div className="meta-desc">
+              <p className="meta-desc-text">{descShown}</p>
+              {descLong && (
+                <button
+                  type="button"
+                  className="linkish"
+                  onClick={() => setDescOpen((v) => !v)}
+                >
+                  {descOpen ? "閉じる" : "もっと見る"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {attrs.length > 0 && (
+            <div className="traits" aria-label="Attributes">
+              {attrs.map((a, i) => (
+                <div className="trait" key={`${a.trait_type}-${i}`}>
+                  <span className="trait-type">{a.trait_type || "Trait"}</span>
+                  <span className="trait-value">{String(a.value ?? "—")}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="stat-block">
             <div className="stat-label">現在の入札額</div>

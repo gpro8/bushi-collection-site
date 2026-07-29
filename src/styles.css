@@ -210,10 +210,88 @@ a:hover {
 }
 
 .side h1 {
-  margin: 0 0 1.25rem;
-  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.45rem, 2.8vw, 1.95rem);
   font-weight: 700;
   letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.lot-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.meta-desc {
+  margin: 0 0 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.meta-desc-text {
+  margin: 0;
+  font-size: 0.92rem;
+  color: #c8c4ba;
+  white-space: pre-line;
+  line-height: 1.55;
+}
+
+.linkish {
+  margin-top: 0.4rem;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.traits {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0 0 1.15rem;
+}
+
+@media (min-width: 520px) {
+  .traits {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.trait {
+  background: #0c0c12;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.trait-type {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trait-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stat-block {
