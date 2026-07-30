@@ -10,6 +10,7 @@ import {
 } from "wagmi";
 import { formatEther, parseEther, type Address } from "viem";
 import { AdminCreateAuction } from "./AdminCreateAuction";
+import { BidHistoryModal } from "./BidHistoryModal";
 import {
   AUCTION_ABI,
   AUCTION_ADDRESS,
@@ -218,6 +219,7 @@ export default function App() {
   const [meta, setMeta] = useState<NftMeta>({});
   const [descOpen, setDescOpen] = useState(false);
   const [artBroken, setArtBroken] = useState(false);
+  const [bidHistoryOpen, setBidHistoryOpen] = useState(false);
   const [bidInput, setBidInput] = useState("");
   const [status, setStatus] = useState<string | null>(null);
 
@@ -479,6 +481,18 @@ export default function App() {
             <div className="stat-meta">
               最高入札者 {shortAddr(state?.highestBidder)}
             </div>
+            {state && state.id > 0n && (
+              <button
+                type="button"
+                className="bid-history-btn"
+                onClick={() => setBidHistoryOpen(true)}
+              >
+                <span className="bid-history-ico" aria-hidden>
+                  ≡
+                </span>
+                入札履歴
+              </button>
+            )}
           </div>
 
           <div className="stat-block">
@@ -599,6 +613,12 @@ export default function App() {
         onCreated={() => {
           refetchState();
         }}
+      />
+
+      <BidHistoryModal
+        currentAuctionId={state?.id ?? 0n}
+        open={bidHistoryOpen}
+        onClose={() => setBidHistoryOpen(false)}
       />
 
       <section className="about">
