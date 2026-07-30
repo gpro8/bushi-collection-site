@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createPublicClient,
   formatEther,
@@ -24,10 +24,9 @@ export type LotInfo = {
   tokenURI: string;
 };
 
-/** Base public RPC: max ~2000 blocks per eth_getLogs + strict rate limits */
 const LOG_CHUNK = 1999n;
 const AUCTION_DEPLOY_BLOCK = 44_524_924n;
-const CHUNK_DELAY_MS = 120;
+const CHUNK_DELAY_MS = 140;
 
 const bidEvent = parseAbiItem(
   "event BidPlaced(uint256 indexed auctionId, address indexed bidder, uint256 amount, uint256 endTime)"
@@ -38,11 +37,7 @@ const createdEvent = parseAbiItem(
 
 const client = createPublicClient({
   chain: CHAIN,
-  transport: http(RPC_URL, {
-    // avoid hammering public endpoint
-    retryCount: 2,
-    retryDelay: 400,
-  }),
+  transport: http(RPC_URL, { retryCount: 2, retryDelay: 500 }),
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -77,25 +72,14 @@ function fmtLocal(ts?: number) {
   }
 }
 
-function cacheGet<T>(key: string): T | null {
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
+function ipfsToHttp(uri: string): string {
+  if (!uri) return "";
+  if (uri.startsWith("ipfs://")) {
+    return `https://gateway.pinata.cloud/ipfs/${uri.slice(7)}`;
   }
+  return arweaveToHttp(uri);
 }
 
-function cacheSet(key: string, value: unknown) {
-  try {
-    sessionStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* quota */
-  }
-}
-
-/** One chunk with gentle retry on rate limit */
 async function getLogsOnce(params: {
   event: typeof bidEvent | typeof createdEvent;
   args?: { auctionId?: bigint };
@@ -103,7 +87,7 @@ async function getLogsOnce(params: {
   toBlock: bigint;
 }): Promise<Log[]> {
   const { event, args, fromBlock, toBlock } = params;
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     try {
       return (await client.getLogs({
         address: AUCTION_ADDRESS,
@@ -114,8 +98,8 @@ async function getLogsOnce(params: {
       })) as Log[];
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (/rate limit|429|timeout/i.test(msg) && attempt < 3) {
-        await sleep(500 * (attempt + 1));
+      if (/rate limit|429|timeout|limit/i.test(msg) && attempt < 4) {
+        await sleep(600 * (attempt + 1));
         continue;
       }
       throw e;
@@ -124,115 +108,8 @@ async function getLogsOnce(params: {
   return [];
 }
 
-/**
- * Scan newest → oldest in 2k-block windows (sequential).
- * Stops early after `emptyStop` empty chunks once we already have logs,
- * or when we hit deploy block.
- */
-async function scanLogsBackward(params: {
-  event: typeof bidEvent | typeof createdEvent;
-  args?: { auctionId?: bigint };
-  emptyStop?: number;
-  onProgress?: (n: number) => void;
-}): Promise<Log[]> {
-  const latest = await client.getBlockNumber();
-  const floor = AUCTION_DEPLOY_BLOCK;
-  const emptyStop = params.emptyStop ?? 8;
-  const all: Log[] = [];
-  let emptyRun = 0;
-  let to = latest;
-  let chunks = 0;
-
-  while (to >= floor) {
-    const from = to > floor + LOG_CHUNK ? to - LOG_CHUNK : floor;
-    const chunk = await getLogsOnce({
-      event: params.event,
-      args: params.args,
-      fromBlock: from,
-      toBlock: to,
-    });
-    chunks++;
-    params.onProgress?.(chunks);
-
-    if (chunk.length === 0) {
-      emptyRun++;
-      if (all.length > 0 && emptyRun >= emptyStop) break;
-    } else {
-      emptyRun = 0;
-      // prepend older logs so final order is chronological then we reverse
-      all.push(...chunk);
-    }
-
-    if (from === floor) break;
-    to = from - 1n;
-    await sleep(CHUNK_DELAY_MS);
-  }
-
-  return all;
-}
-
-type LotCache = { id: string; tokenURI: string }[];
-
-async function fetchLots(): Promise<LotInfo[]> {
-  const cached = cacheGet<LotCache>("bushi-lots-v1");
-  if (cached?.length) {
-    return cached.map((l) => ({ id: BigInt(l.id), tokenURI: l.tokenURI }));
-  }
-
-  const logs = await scanLogsBackward({
-    event: createdEvent,
-    emptyStop: 12,
-  });
-
-  const map = new Map<string, LotInfo>();
-  for (const log of logs) {
-    const args = (log as any).args || {};
-    const id = args.auctionId as bigint;
-    if (id == null) continue;
-    map.set(id.toString(), {
-      id,
-      tokenURI: (args.tokenURI as string) || "",
-    });
-  }
-  const lots = [...map.values()].sort((a, b) => Number(a.id - b.id));
-  cacheSet(
-    "bushi-lots-v1",
-    lots.map((l) => ({ id: l.id.toString(), tokenURI: l.tokenURI }))
-  );
-  return lots;
-}
-
-type BidCache = {
-  bidder: string;
-  amount: string;
-  endTime: string;
-  blockNumber: string;
-  txHash: string;
-  timestamp?: number;
-}[];
-
-async function fetchBids(auctionId: bigint): Promise<BidRow[]> {
-  const key = `bushi-bids-v1-${auctionId.toString()}`;
-  const cached = cacheGet<BidCache>(key);
-  if (cached?.length) {
-    return cached.map((b) => ({
-      bidder: b.bidder as Address,
-      amount: BigInt(b.amount),
-      endTime: BigInt(b.endTime),
-      blockNumber: BigInt(b.blockNumber),
-      txHash: b.txHash as Hex,
-      timestamp: b.timestamp,
-    }));
-  }
-
-  const logs = await scanLogsBackward({
-    event: bidEvent,
-    args: { auctionId },
-    // bids for one lot are clustered; stop sooner after gap
-    emptyStop: 6,
-  });
-
-  const rows: BidRow[] = logs.map((log) => {
+function logsToBids(logs: Log[]): BidRow[] {
+  return logs.map((log) => {
     const args = (log as any).args || {};
     return {
       bidder: args.bidder as Address,
@@ -242,49 +119,129 @@ async function fetchBids(auctionId: bigint): Promise<BidRow[]> {
       txHash: log.transactionHash as Hex,
     };
   });
+}
 
-  // Sort newest first by block
-  rows.sort((a, b) => Number(b.blockNumber - a.blockNumber));
-
-  // Timestamps — few unique blocks typically
-  const uniqueBlocks = [...new Set(rows.map((r) => r.blockNumber.toString()))];
+async function attachTimestamps(rows: BidRow[]): Promise<BidRow[]> {
+  const need = rows.filter((r) => r.timestamp == null);
+  const unique = [...new Set(need.map((r) => r.blockNumber.toString()))];
   const tsMap = new Map<string, number>();
-  for (const bn of uniqueBlocks) {
+  for (const bn of unique) {
     try {
       const b = await client.getBlock({ blockNumber: BigInt(bn) });
       tsMap.set(bn, Number(b.timestamp));
-      await sleep(40);
+      await sleep(30);
     } catch {
       /* ignore */
     }
   }
-
-  const withTs = rows.map((r) => ({
-    ...r,
-    timestamp: tsMap.get(r.blockNumber.toString()),
-  }));
-
-  cacheSet(
-    key,
-    withTs.map((b) => ({
-      bidder: b.bidder,
-      amount: b.amount.toString(),
-      endTime: b.endTime.toString(),
-      blockNumber: b.blockNumber.toString(),
-      txHash: b.txHash,
-      timestamp: b.timestamp,
-    }))
+  return rows.map((r) =>
+    r.timestamp != null
+      ? r
+      : { ...r, timestamp: tsMap.get(r.blockNumber.toString()) }
   );
-
-  return withTs;
 }
 
-function ipfsToHttp(uri: string): string {
-  if (!uri) return "";
-  if (uri.startsWith("ipfs://")) {
-    return `https://gateway.pinata.cloud/ipfs/${uri.slice(7)}`;
+/** Merge + dedupe by txHash, newest first */
+function mergeBids(prev: BidRow[], more: BidRow[]): BidRow[] {
+  const map = new Map<string, BidRow>();
+  for (const b of [...prev, ...more]) {
+    map.set(b.txHash, b);
   }
-  return arweaveToHttp(uri);
+  return [...map.values()].sort((a, b) =>
+    a.blockNumber === b.blockNumber
+      ? 0
+      : a.blockNumber > b.blockNumber
+        ? -1
+        : 1
+  );
+}
+
+// —— Cursor scanner (newest → older), resumable ——
+type ScanCursor = {
+  nextTo: bigint; // next window ends here (inclusive); 0n = done
+  floor: bigint;
+};
+
+function freshCursor(latest: bigint): ScanCursor {
+  return {
+    nextTo: latest,
+    floor: AUCTION_DEPLOY_BLOCK,
+  };
+}
+
+/** Fetch up to `maxChunks` windows; returns new bids (chrono) + updated cursor */
+async function scanBidsPage(
+  auctionId: bigint,
+  cursor: ScanCursor,
+  maxChunks = 4
+): Promise<{ bids: BidRow[]; cursor: ScanCursor; done: boolean }> {
+  if (cursor.nextTo < cursor.floor) {
+    return { bids: [], cursor, done: true };
+  }
+
+  const found: BidRow[] = [];
+  let to = cursor.nextTo;
+  let chunks = 0;
+
+  while (to >= cursor.floor && chunks < maxChunks) {
+    const from = to > cursor.floor + LOG_CHUNK ? to - LOG_CHUNK : cursor.floor;
+    const logs = await getLogsOnce({
+      event: bidEvent,
+      args: { auctionId },
+      fromBlock: from,
+      toBlock: to,
+    });
+    chunks++;
+    found.push(...logsToBids(logs));
+    if (from === cursor.floor) {
+      to = cursor.floor - 1n;
+      break;
+    }
+    to = from - 1n;
+    await sleep(CHUNK_DELAY_MS);
+  }
+
+  const done = to < cursor.floor;
+  const withTs = await attachTimestamps(found);
+  return {
+    bids: withTs,
+    cursor: { ...cursor, nextTo: to },
+    done,
+  };
+}
+
+async function fetchLotsOnce(): Promise<LotInfo[]> {
+  const latest = await client.getBlockNumber();
+  let to = latest;
+  const floor = AUCTION_DEPLOY_BLOCK;
+  const map = new Map<string, LotInfo>();
+  let empty = 0;
+  // Enough windows for lot list; stop after gap once we have some
+  while (to >= floor && empty < 10) {
+    const from = to > floor + LOG_CHUNK ? to - LOG_CHUNK : floor;
+    const logs = await getLogsOnce({
+      event: createdEvent,
+      fromBlock: from,
+      toBlock: to,
+    });
+    if (logs.length === 0) empty++;
+    else {
+      empty = 0;
+      for (const log of logs) {
+        const args = (log as any).args || {};
+        const id = args.auctionId as bigint;
+        if (id == null) continue;
+        map.set(id.toString(), {
+          id,
+          tokenURI: (args.tokenURI as string) || "",
+        });
+      }
+    }
+    if (from === floor) break;
+    to = from - 1n;
+    await sleep(CHUNK_DELAY_MS);
+  }
+  return [...map.values()].sort((a, b) => Number(a.id - b.id));
 }
 
 async function resolveLotMeta(tokenURI: string): Promise<{
@@ -331,82 +288,131 @@ export function BidHistoryModal({
   const [bids, setBids] = useState<BidRow[]>([]);
   const [meta, setMeta] = useState<{ name?: string; image?: string }>({});
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [hint, setHint] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const cursorRef = useRef<ScanCursor | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const loadGen = useRef(0);
 
+  // Reset view when opened
   useEffect(() => {
     if (open) setViewId(currentAuctionId);
   }, [open, currentAuctionId]);
 
-  const load = useCallback(
+  const startFreshScan = useCallback(
     async (id: bigint) => {
+      const gen = ++loadGen.current;
       setLoading(true);
+      setLoadingMore(false);
       setErr(null);
-      setHint("履歴を読み込み中…");
+      setBids([]);
+      setDone(false);
+      cursorRef.current = null;
+
+      if (id === currentAuctionId) {
+        setMeta({ name: currentTitle, image: currentImage });
+      } else {
+        setMeta({});
+      }
+
       try {
-        // Meta first (fast) — parent for current lot
-        if (id === currentAuctionId) {
-          setMeta({
-            name: currentTitle,
-            image: currentImage,
+        const latest = await client.getBlockNumber();
+        if (gen !== loadGen.current) return;
+        let cursor = freshCursor(latest);
+        // First page — enough chunks to fill UI
+        const page = await scanBidsPage(id, cursor, 6);
+        if (gen !== loadGen.current) return;
+        cursorRef.current = page.cursor;
+        setBids(mergeBids([], page.bids));
+        setDone(page.done);
+        setLoading(false);
+
+        // Lots in background (for ‹ › only)
+        fetchLotsOnce()
+          .then((lotList) => {
+            if (gen !== loadGen.current) return;
+            let list = lotList;
+            if (
+              id === currentAuctionId &&
+              currentTokenURI &&
+              !list.some((l) => l.id === id)
+            ) {
+              list = [...list, { id, tokenURI: currentTokenURI }].sort(
+                (a, b) => Number(a.id - b.id)
+              );
+            }
+            setLots(list);
+            if (id !== currentAuctionId) {
+              const lot = list.find((l) => l.id === id);
+              resolveLotMeta(lot?.tokenURI || "").then((m) => {
+                if (gen === loadGen.current) setMeta(m);
+              });
+            } else if (!currentImage || !currentTitle) {
+              resolveLotMeta(currentTokenURI || "").then((m) => {
+                if (gen !== loadGen.current) return;
+                setMeta({
+                  name: currentTitle || m.name,
+                  image: currentImage || m.image,
+                });
+              });
+            }
+          })
+          .catch(() => {
+            /* non-fatal */
           });
-        } else {
-          setMeta({});
-        }
-
-        // Bids for this lot (main ask)
-        const bidList = await fetchBids(id);
-        setBids(bidList);
-        setHint(null);
-
-        // Lots for ‹ › — may use cache; don't block bids display
-        let lotList: LotInfo[] = [];
-        try {
-          lotList = await fetchLots();
-        } catch {
-          lotList = [];
-        }
-        if (
-          id === currentAuctionId &&
-          currentTokenURI &&
-          !lotList.some((l) => l.id === id)
-        ) {
-          lotList = [...lotList, { id, tokenURI: currentTokenURI }].sort(
-            (a, b) => Number(a.id - b.id)
-          );
-        }
-        setLots(lotList);
-
-        // Enrich meta for other lots
-        if (id !== currentAuctionId) {
-          const lot = lotList.find((l) => l.id === id);
-          const m = await resolveLotMeta(lot?.tokenURI || "");
-          setMeta(m);
-        } else if (!currentImage || !currentTitle) {
-          const lot = lotList.find((l) => l.id === id);
-          const m = await resolveLotMeta(
-            currentTokenURI || lot?.tokenURI || ""
-          );
-          setMeta({
-            name: currentTitle || m.name,
-            image: currentImage || m.image,
-          });
-        }
       } catch (e) {
+        if (gen !== loadGen.current) return;
         setErr(e instanceof Error ? e.message : "履歴の取得に失敗しました");
-        setBids([]);
-        setHint(null);
-      } finally {
         setLoading(false);
       }
     },
     [currentAuctionId, currentTokenURI, currentTitle, currentImage]
   );
 
+  // Every open + every lot change → full fresh reload (no sticky cache)
   useEffect(() => {
     if (!open || viewId <= 0n) return;
-    load(viewId);
-  }, [open, viewId, load]);
+    startFreshScan(viewId);
+    return () => {
+      loadGen.current++; // cancel in-flight
+    };
+  }, [open, viewId, startFreshScan]);
+
+  const loadOlder = useCallback(async () => {
+    if (done || loading || loadingMore) return;
+    const cursor = cursorRef.current;
+    if (!cursor || cursor.nextTo < cursor.floor) {
+      setDone(true);
+      return;
+    }
+    const gen = loadGen.current;
+    setLoadingMore(true);
+    try {
+      const page = await scanBidsPage(viewId, cursor, 5);
+      if (gen !== loadGen.current) return;
+      cursorRef.current = page.cursor;
+      setBids((prev) => mergeBids(prev, page.bids));
+      setDone(page.done);
+    } catch (e) {
+      if (gen !== loadGen.current) return;
+      setErr(e instanceof Error ? e.message : "追加読み込みに失敗");
+    } finally {
+      if (gen === loadGen.current) setLoadingMore(false);
+    }
+  }, [done, loading, loadingMore, viewId]);
+
+  // Infinite scroll inside list
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || !open) return;
+    const onScroll = () => {
+      const remain = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (remain < 48) loadOlder();
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [open, loadOlder, bids.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -450,15 +456,7 @@ export function BidHistoryModal({
           </button>
           <div className="modal-lot">
             {meta.image ? (
-              <img
-                src={meta.image}
-                alt=""
-                className="modal-thumb"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "";
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
+              <img src={meta.image} alt="" className="modal-thumb" />
             ) : (
               <div className="modal-thumb placeholder">武</div>
             )}
@@ -490,18 +488,23 @@ export function BidHistoryModal({
           </button>
         </div>
 
-        <h3 className="modal-section">入札履歴</h3>
+        <div className="modal-section-row">
+          <h3 className="modal-section">入札履歴</h3>
+          <span className="modal-count">
+            {bids.length > 0 ? `${bids.length} 件` : ""}
+          </span>
+        </div>
 
-        {loading && (
-          <p className="modal-empty">{hint || "読み込み中…"}</p>
+        {loading && bids.length === 0 && (
+          <p className="modal-empty">履歴を読み込み中…</p>
         )}
         {err && <p className="modal-empty err">{err}</p>}
         {!loading && !err && bids.length === 0 && (
           <p className="modal-empty">まだ入札がありません</p>
         )}
 
-        {!loading && !err && bids.length > 0 && (
-          <ul className="bid-hist-list">
+        {bids.length > 0 && (
+          <ul className="bid-hist-list" ref={listRef}>
             {bids.map((b, i) => (
               <li key={`${b.txHash}-${i}`}>
                 <span
@@ -514,11 +517,22 @@ export function BidHistoryModal({
                 <span className="bid-when">{fmtLocal(b.timestamp)}</span>
               </li>
             ))}
+            <li className="bid-hist-footer">
+              {loadingMore && <span>さらに読み込み中…</span>}
+              {!loadingMore && !done && (
+                <button type="button" className="linkish" onClick={loadOlder}>
+                  古い履歴を読み込む
+                </button>
+              )}
+              {!loadingMore && done && (
+                <span className="muted">すべての履歴を表示しています</span>
+              )}
+            </li>
           </ul>
         )}
 
         <p className="modal-foot-note">
-          時刻はお使いの端末のローカルタイムゾーンです
+          開くたびに最新を取得 · スクロールで過去分を追加 · ローカル時刻
         </p>
       </div>
     </div>

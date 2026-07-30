@@ -606,12 +606,63 @@ a:hover {
 .modal {
   width: min(440px, 100%);
   max-height: min(86vh, 640px);
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: #14161c;
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 1rem 1.1rem 1.15rem;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.modal-section-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
+}
+
+.modal-section {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.modal-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.bid-hist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 120px;
+  max-height: min(48vh, 360px);
+  -webkit-overflow-scrolling: touch;
+}
+
+.bid-hist-footer {
+  display: block !important;
+  text-align: center;
+  padding: 0.75rem 0.25rem !important;
+  border-bottom: none !important;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.bid-hist-footer .linkish {
+  margin: 0;
+}
+
+.bid-hist-footer .muted {
+  color: var(--muted);
 }
 
 .modal-head {
@@ -681,19 +732,6 @@ a:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 200px;
-}
-
-.modal-section {
-  margin: 0 0 0.65rem;
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.bid-hist-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border-top: 1px solid var(--border);
 }
 
 .bid-hist-list li {
