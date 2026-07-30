@@ -24,10 +24,10 @@ export type LotInfo = {
   tokenURI: string;
 };
 
-/** Base public RPC: max ~2000 blocks per eth_getLogs */
+/** Base public RPC: max ~2000 blocks per eth_getLogs + strict rate limits */
 const LOG_CHUNK = 1999n;
-/** BushiCollectionAuction deploy on Base Sepolia (84532) */
 const AUCTION_DEPLOY_BLOCK = 44_524_924n;
+const CHUNK_DELAY_MS = 120;
 
 const bidEvent = parseAbiItem(
   "event BidPlaced(uint256 indexed auctionId, address indexed bidder, uint256 amount, uint256 endTime)"
@@ -38,8 +38,14 @@ const createdEvent = parseAbiItem(
 
 const client = createPublicClient({
   chain: CHAIN,
-  transport: http(RPC_URL),
+  transport: http(RPC_URL, {
+    // avoid hammering public endpoint
+    retryCount: 2,
+    retryDelay: 400,
+  }),
 });
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function shortAddr(a?: string) {
   if (!a || a === "0x0000000000000000000000000000000000000000") return "—";
@@ -71,53 +77,113 @@ function fmtLocal(ts?: number) {
   }
 }
 
-/** Walk [from..to] in ≤2000-block windows (Base Sepolia public RPC limit). */
-async function getLogsChunked(params: {
+function cacheGet<T>(key: string): T | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function cacheSet(key: string, value: unknown) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* quota */
+  }
+}
+
+/** One chunk with gentle retry on rate limit */
+async function getLogsOnce(params: {
   event: typeof bidEvent | typeof createdEvent;
   args?: { auctionId?: bigint };
   fromBlock: bigint;
   toBlock: bigint;
 }): Promise<Log[]> {
   const { event, args, fromBlock, toBlock } = params;
-  if (toBlock < fromBlock) return [];
-
-  const ranges: { start: bigint; end: bigint }[] = [];
-  let start = fromBlock;
-  while (start <= toBlock) {
-    let end = start + LOG_CHUNK;
-    if (end > toBlock) end = toBlock;
-    ranges.push({ start, end });
-    start = end + 1n;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return (await client.getLogs({
+        address: AUCTION_ADDRESS,
+        event,
+        args: args as any,
+        fromBlock,
+        toBlock,
+      })) as Log[];
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/rate limit|429|timeout/i.test(msg) && attempt < 3) {
+        await sleep(500 * (attempt + 1));
+        continue;
+      }
+      throw e;
+    }
   }
+  return [];
+}
 
+/**
+ * Scan newest → oldest in 2k-block windows (sequential).
+ * Stops early after `emptyStop` empty chunks once we already have logs,
+ * or when we hit deploy block.
+ */
+async function scanLogsBackward(params: {
+  event: typeof bidEvent | typeof createdEvent;
+  args?: { auctionId?: bigint };
+  emptyStop?: number;
+  onProgress?: (n: number) => void;
+}): Promise<Log[]> {
+  const latest = await client.getBlockNumber();
+  const floor = AUCTION_DEPLOY_BLOCK;
+  const emptyStop = params.emptyStop ?? 8;
   const all: Log[] = [];
-  const concurrency = 10;
-  for (let i = 0; i < ranges.length; i += concurrency) {
-    const batch = ranges.slice(i, i + concurrency);
-    const parts = await Promise.all(
-      batch.map(({ start: s, end: e }) =>
-        client.getLogs({
-          address: AUCTION_ADDRESS,
-          event,
-          args: args as any,
-          fromBlock: s,
-          toBlock: e,
-        })
-      )
-    );
-    for (const p of parts) all.push(...(p as Log[]));
+  let emptyRun = 0;
+  let to = latest;
+  let chunks = 0;
+
+  while (to >= floor) {
+    const from = to > floor + LOG_CHUNK ? to - LOG_CHUNK : floor;
+    const chunk = await getLogsOnce({
+      event: params.event,
+      args: params.args,
+      fromBlock: from,
+      toBlock: to,
+    });
+    chunks++;
+    params.onProgress?.(chunks);
+
+    if (chunk.length === 0) {
+      emptyRun++;
+      if (all.length > 0 && emptyRun >= emptyStop) break;
+    } else {
+      emptyRun = 0;
+      // prepend older logs so final order is chronological then we reverse
+      all.push(...chunk);
+    }
+
+    if (from === floor) break;
+    to = from - 1n;
+    await sleep(CHUNK_DELAY_MS);
   }
+
   return all;
 }
 
+type LotCache = { id: string; tokenURI: string }[];
+
 async function fetchLots(): Promise<LotInfo[]> {
-  const latest = await client.getBlockNumber();
-  const from = AUCTION_DEPLOY_BLOCK < latest ? AUCTION_DEPLOY_BLOCK : 0n;
-  const logs = await getLogsChunked({
+  const cached = cacheGet<LotCache>("bushi-lots-v1");
+  if (cached?.length) {
+    return cached.map((l) => ({ id: BigInt(l.id), tokenURI: l.tokenURI }));
+  }
+
+  const logs = await scanLogsBackward({
     event: createdEvent,
-    fromBlock: from,
-    toBlock: latest,
+    emptyStop: 12,
   });
+
   const map = new Map<string, LotInfo>();
   for (const log of logs) {
     const args = (log as any).args || {};
@@ -128,17 +194,42 @@ async function fetchLots(): Promise<LotInfo[]> {
       tokenURI: (args.tokenURI as string) || "",
     });
   }
-  return [...map.values()].sort((a, b) => Number(a.id - b.id));
+  const lots = [...map.values()].sort((a, b) => Number(a.id - b.id));
+  cacheSet(
+    "bushi-lots-v1",
+    lots.map((l) => ({ id: l.id.toString(), tokenURI: l.tokenURI }))
+  );
+  return lots;
 }
 
+type BidCache = {
+  bidder: string;
+  amount: string;
+  endTime: string;
+  blockNumber: string;
+  txHash: string;
+  timestamp?: number;
+}[];
+
 async function fetchBids(auctionId: bigint): Promise<BidRow[]> {
-  const latest = await client.getBlockNumber();
-  const from = AUCTION_DEPLOY_BLOCK < latest ? AUCTION_DEPLOY_BLOCK : 0n;
-  const logs = await getLogsChunked({
+  const key = `bushi-bids-v1-${auctionId.toString()}`;
+  const cached = cacheGet<BidCache>(key);
+  if (cached?.length) {
+    return cached.map((b) => ({
+      bidder: b.bidder as Address,
+      amount: BigInt(b.amount),
+      endTime: BigInt(b.endTime),
+      blockNumber: BigInt(b.blockNumber),
+      txHash: b.txHash as Hex,
+      timestamp: b.timestamp,
+    }));
+  }
+
+  const logs = await scanLogsBackward({
     event: bidEvent,
     args: { auctionId },
-    fromBlock: from,
-    toBlock: latest,
+    // bids for one lot are clustered; stop sooner after gap
+    emptyStop: 6,
   });
 
   const rows: BidRow[] = logs.map((log) => {
@@ -152,38 +243,46 @@ async function fetchBids(auctionId: bigint): Promise<BidRow[]> {
     };
   });
 
-  // Newest first
-  rows.reverse();
+  // Sort newest first by block
+  rows.sort((a, b) => Number(b.blockNumber - a.blockNumber));
 
+  // Timestamps — few unique blocks typically
   const uniqueBlocks = [...new Set(rows.map((r) => r.blockNumber.toString()))];
   const tsMap = new Map<string, number>();
-  // sequential small batches to avoid RPC flood
-  for (let i = 0; i < uniqueBlocks.length; i += 8) {
-    const batch = uniqueBlocks.slice(i, i + 8);
-    await Promise.all(
-      batch.map(async (bn) => {
-        try {
-          const b = await client.getBlock({ blockNumber: BigInt(bn) });
-          tsMap.set(bn, Number(b.timestamp));
-        } catch {
-          /* ignore */
-        }
-      })
-    );
+  for (const bn of uniqueBlocks) {
+    try {
+      const b = await client.getBlock({ blockNumber: BigInt(bn) });
+      tsMap.set(bn, Number(b.timestamp));
+      await sleep(40);
+    } catch {
+      /* ignore */
+    }
   }
 
-  return rows.map((r) => ({
+  const withTs = rows.map((r) => ({
     ...r,
     timestamp: tsMap.get(r.blockNumber.toString()),
   }));
+
+  cacheSet(
+    key,
+    withTs.map((b) => ({
+      bidder: b.bidder,
+      amount: b.amount.toString(),
+      endTime: b.endTime.toString(),
+      blockNumber: b.blockNumber.toString(),
+      txHash: b.txHash,
+      timestamp: b.timestamp,
+    }))
+  );
+
+  return withTs;
 }
 
 function ipfsToHttp(uri: string): string {
   if (!uri) return "";
   if (uri.startsWith("ipfs://")) {
-    const path = uri.slice(7);
-    // Prefer Pinata gateway first (common for Bushi metadata), then public
-    return `https://gateway.pinata.cloud/ipfs/${path}`;
+    return `https://gateway.pinata.cloud/ipfs/${uri.slice(7)}`;
   }
   return arweaveToHttp(uri);
 }
@@ -194,14 +293,15 @@ async function resolveLotMeta(tokenURI: string): Promise<{
 }> {
   if (!tokenURI) return {};
   try {
-    const url = ipfsToHttp(tokenURI);
-    const res = await fetch(url);
+    const res = await fetch(ipfsToHttp(tokenURI));
     if (!res.ok) return {};
     const t = await res.text();
     if (t.trimStart().startsWith("{")) {
       const j = JSON.parse(t) as { name?: string; image?: string };
-      const img = j.image ? ipfsToHttp(j.image) : undefined;
-      return { name: j.name, image: img };
+      return {
+        name: j.name,
+        image: j.image ? ipfsToHttp(j.image) : undefined,
+      };
     }
   } catch {
     /* ignore */
@@ -211,7 +311,6 @@ async function resolveLotMeta(tokenURI: string): Promise<{
 
 type Props = {
   currentAuctionId: bigint;
-  /** Fallback when logs lag — current lot URI / display from parent */
   currentTokenURI?: string;
   currentTitle?: string;
   currentImage?: string;
@@ -233,6 +332,7 @@ export function BidHistoryModal({
   const [meta, setMeta] = useState<{ name?: string; image?: string }>({});
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) setViewId(currentAuctionId);
@@ -242,40 +342,60 @@ export function BidHistoryModal({
     async (id: bigint) => {
       setLoading(true);
       setErr(null);
+      setHint("履歴を読み込み中…");
       try {
-        const [lotList, bidList] = await Promise.all([
-          fetchLots(),
-          fetchBids(id),
-        ]);
-        // Ensure current lot appears even if a chunk missed it
+        // Meta first (fast) — parent for current lot
+        if (id === currentAuctionId) {
+          setMeta({
+            name: currentTitle,
+            image: currentImage,
+          });
+        } else {
+          setMeta({});
+        }
+
+        // Bids for this lot (main ask)
+        const bidList = await fetchBids(id);
+        setBids(bidList);
+        setHint(null);
+
+        // Lots for ‹ › — may use cache; don't block bids display
+        let lotList: LotInfo[] = [];
+        try {
+          lotList = await fetchLots();
+        } catch {
+          lotList = [];
+        }
         if (
           id === currentAuctionId &&
           currentTokenURI &&
           !lotList.some((l) => l.id === id)
         ) {
-          lotList.push({ id, tokenURI: currentTokenURI });
-          lotList.sort((a, b) => Number(a.id - b.id));
+          lotList = [...lotList, { id, tokenURI: currentTokenURI }].sort(
+            (a, b) => Number(a.id - b.id)
+          );
         }
         setLots(lotList);
-        setBids(bidList);
 
-        const lot = lotList.find((l) => l.id === id);
-        let uri = lot?.tokenURI || "";
-        if (id === currentAuctionId && currentTokenURI) {
-          uri = currentTokenURI;
+        // Enrich meta for other lots
+        if (id !== currentAuctionId) {
+          const lot = lotList.find((l) => l.id === id);
+          const m = await resolveLotMeta(lot?.tokenURI || "");
+          setMeta(m);
+        } else if (!currentImage || !currentTitle) {
+          const lot = lotList.find((l) => l.id === id);
+          const m = await resolveLotMeta(
+            currentTokenURI || lot?.tokenURI || ""
+          );
+          setMeta({
+            name: currentTitle || m.name,
+            image: currentImage || m.image,
+          });
         }
-        let m = await resolveLotMeta(uri);
-        // Parent already resolved image/title for live lot
-        if (id === currentAuctionId) {
-          m = {
-            name: m.name || currentTitle,
-            image: m.image || currentImage,
-          };
-        }
-        setMeta(m);
       } catch (e) {
         setErr(e instanceof Error ? e.message : "履歴の取得に失敗しました");
         setBids([]);
+        setHint(null);
       } finally {
         setLoading(false);
       }
@@ -304,7 +424,6 @@ export function BidHistoryModal({
   const hasNext = idx >= 0 && idx < lots.length - 1;
 
   const lotLabel = `Bushi #${viewId.toString()}`;
-  // Prefer metadata title; avoid duplicating "Bushi #N" twice
   const displayTitle =
     meta.name && meta.name.trim() && meta.name.trim() !== lotLabel
       ? meta.name.trim()
@@ -336,6 +455,7 @@ export function BidHistoryModal({
                 alt=""
                 className="modal-thumb"
                 onError={(e) => {
+                  (e.target as HTMLImageElement).src = "";
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
               />
@@ -372,7 +492,9 @@ export function BidHistoryModal({
 
         <h3 className="modal-section">入札履歴</h3>
 
-        {loading && <p className="modal-empty">読み込み中…</p>}
+        {loading && (
+          <p className="modal-empty">{hint || "読み込み中…"}</p>
+        )}
         {err && <p className="modal-empty err">{err}</p>}
         {!loading && !err && bids.length === 0 && (
           <p className="modal-empty">まだ入札がありません</p>
