@@ -617,6 +617,9 @@ export default function App() {
 
       <BidHistoryModal
         currentAuctionId={state?.id ?? 0n}
+        currentTokenURI={state?.tokenURI}
+        currentTitle={meta.name || title}
+        currentImage={artUrl || undefined}
         open={bidHistoryOpen}
         onClose={() => setBidHistoryOpen(false)}
       />
