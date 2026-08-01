@@ -26,7 +26,11 @@ export type LotInfo = {
 
 const LOG_CHUNK = 1999n;
 const AUCTION_DEPLOY_BLOCK = 44_524_924n;
-const CHUNK_DELAY_MS = 140;
+const CHUNK_DELAY_MS = 100;
+/** First open: keep scanning until this many newest bids (not a time window). */
+const INITIAL_BID_TARGET = 5;
+/** Safety: max 2000-block windows per scan call (~400k blocks). */
+const MAX_CHUNKS_PER_SCAN = 250;
 
 const bidEvent = parseAbiItem(
   "event BidPlaced(uint256 indexed auctionId, address indexed bidder, uint256 amount, uint256 endTime)"
@@ -169,11 +173,12 @@ function freshCursor(latest: bigint): ScanCursor {
   };
 }
 
-/** Fetch up to `maxChunks` windows; returns new bids (chrono) + updated cursor */
+/** Fetch windows newest→older until `minBids` collected or history exhausted. */
 async function scanBidsPage(
   auctionId: bigint,
   cursor: ScanCursor,
-  maxChunks = 4
+  minBids: number,
+  maxChunks = MAX_CHUNKS_PER_SCAN
 ): Promise<{ bids: BidRow[]; cursor: ScanCursor; done: boolean }> {
   if (cursor.nextTo < cursor.floor) {
     return { bids: [], cursor, done: true };
@@ -183,7 +188,11 @@ async function scanBidsPage(
   let to = cursor.nextTo;
   let chunks = 0;
 
-  while (to >= cursor.floor && chunks < maxChunks) {
+  while (
+    to >= cursor.floor &&
+    chunks < maxChunks &&
+    found.length < minBids
+  ) {
     const from = to > cursor.floor + LOG_CHUNK ? to - LOG_CHUNK : cursor.floor;
     const logs = await getLogsOnce({
       event: bidEvent,
@@ -202,6 +211,14 @@ async function scanBidsPage(
   }
 
   const done = to < cursor.floor;
+  // Newest-first for UI; timestamps only for what we show
+  found.sort((a, b) =>
+    a.blockNumber === b.blockNumber
+      ? 0
+      : a.blockNumber > b.blockNumber
+        ? -1
+        : 1
+  );
   const withTs = await attachTimestamps(found);
   return {
     bids: withTs,
@@ -320,8 +337,8 @@ export function BidHistoryModal({
         const latest = await client.getBlockNumber();
         if (gen !== loadGen.current) return;
         let cursor = freshCursor(latest);
-        // First page — enough chunks to fill UI
-        const page = await scanBidsPage(id, cursor, 6);
+        // Keep scanning until ≥5 newest bids (or full history) — not a time window
+        const page = await scanBidsPage(id, cursor, INITIAL_BID_TARGET);
         if (gen !== loadGen.current) return;
         cursorRef.current = page.cursor;
         setBids(mergeBids([], page.bids));
@@ -389,7 +406,7 @@ export function BidHistoryModal({
     const gen = loadGen.current;
     setLoadingMore(true);
     try {
-      const page = await scanBidsPage(viewId, cursor, 5);
+      const page = await scanBidsPage(viewId, cursor, INITIAL_BID_TARGET);
       if (gen !== loadGen.current) return;
       cursorRef.current = page.cursor;
       setBids((prev) => mergeBids(prev, page.bids));
@@ -496,7 +513,9 @@ export function BidHistoryModal({
         </div>
 
         {loading && bids.length === 0 && (
-          <p className="modal-empty">履歴を読み込み中…</p>
+          <p className="modal-empty">
+            履歴を読み込み中…（最新の入札を検索しています）
+          </p>
         )}
         {err && <p className="modal-empty err">{err}</p>}
         {!loading && !err && bids.length === 0 && (
