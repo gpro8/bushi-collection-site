@@ -377,6 +377,17 @@ a:hover {
   font-variant-numeric: tabular-nums;
 }
 
+.bid-credit-note {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #c9b896;
+  background: rgba(201, 162, 39, 0.08);
+  border: 1px solid rgba(201, 162, 39, 0.25);
+  border-radius: 10px;
+}
+
 .stat-block {
   margin-bottom: 1.15rem;
   padding-bottom: 1rem;

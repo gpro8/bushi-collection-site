@@ -170,6 +170,15 @@ export default function App() {
     query: { enabled: !!address, refetchInterval: 10_000 },
   });
 
+  const { data: minMsgValue } = useReadContract({
+    address: AUCTION_ADDRESS,
+    abi: AUCTION_ABI,
+    functionName: "minMsgValueToBid",
+    args: address ? [address] : undefined,
+    chainId: CHAIN.id,
+    query: { enabled: !!address && !!stateRaw, refetchInterval: 8_000 },
+  });
+
   const state: AuctionState | null = useMemo(() => {
     if (!stateRaw || !Array.isArray(stateRaw)) return null;
     const [
@@ -246,17 +255,39 @@ export default function App() {
 
   const minNextBid = useMemo(() => {
     if (!state) return 0n;
-    if (state.highestBid === 0n) {
-      return state.reservePrice > 0n ? state.reservePrice : state.minBidIncrement;
-    }
-    return state.highestBid + state.minBidIncrement;
+    // Full standing min (for display of "最低合計")
+    const full =
+      state.highestBid === 0n
+        ? state.reservePrice > 0n
+          ? state.reservePrice
+          : state.minBidIncrement
+        : state.highestBid + state.minBidIncrement;
+    return full;
   }, [state]);
 
-  useEffect(() => {
-    if (minNextBid > 0n) {
-      setBidInput(formatEther(minNextBid));
+  /** ETH to send this tx (uses on-chain credit when available) */
+  const minSend = useMemo(() => {
+    if (minMsgValue != null && typeof minMsgValue === "bigint") {
+      if (minMsgValue > 10n ** 30n) return minNextBid; // max = inactive
+      return minMsgValue;
     }
-  }, [minNextBid]);
+    const credit = (pending as bigint | undefined) ?? 0n;
+    if (!state) return 0n;
+    const isHigh =
+      address &&
+      state.highestBidder &&
+      address.toLowerCase() === state.highestBidder.toLowerCase() &&
+      state.highestBid > 0n;
+    if (isHigh) return state.minBidIncrement;
+    if (credit >= minNextBid) return 0n;
+    return minNextBid > credit ? minNextBid - credit : 0n;
+  }, [minMsgValue, pending, state, address, minNextBid]);
+
+  useEffect(() => {
+    if (minSend >= 0n) {
+      setBidInput(formatEther(minSend));
+    }
+  }, [minSend]);
 
   const { writeContract, data: txHash, isPending: writing, reset: resetWrite } =
     useWriteContract();
@@ -287,8 +318,10 @@ export default function App() {
         return;
       }
       const value = parseEther(bidInput || "0");
-      if (value < minNextBid) {
-        setStatus(`最低入札額は ${formatEther(minNextBid)} ETH です`);
+      if (value < minSend) {
+        setStatus(
+          `今回送る ETH の最低は ${formatEther(minSend)}（預託込みで合計 ${formatEther(minNextBid)}）`
+        );
         return;
       }
       writeContract({
@@ -511,14 +544,24 @@ export default function App() {
           {showBid && (
             <div className="bid-row">
               <div className="bid-head">
-                <span className="bid-label">入札額</span>
+                <span className="bid-label">入札（送金額）</span>
                 <span className="bid-hint">
-                  最低 {formatEther(minNextBid)} ETH
+                  今回最低 {formatEther(minSend)} ETH
+                  {pendingAmt > 0n && (
+                    <> · 預託 {formatEther(pendingAmt)} ETH を加算</>
+                  )}
                   {state && state.minBidIncrement > 0n && (
-                    <> · 刻み {formatEther(state.minBidIncrement)} ETH</>
+                    <> · 刻み {formatEther(state.minBidIncrement)}</>
                   )}
                 </span>
               </div>
+              {pendingAmt > 0n && (
+                <p className="bid-credit-note">
+                  預託 {formatEther(pendingAmt)} + 送金 → 合計入札{" "}
+                  {formatEther(minNextBid)} ETH 以上でトップに。
+                  入札すると預託は新しい入札に使われます（引き出さず戦えます）。
+                </p>
+              )}
               <div className="bid-input-wrap">
                 <span className="eth">Ξ</span>
                 <input
@@ -527,7 +570,7 @@ export default function App() {
                   value={bidInput}
                   onChange={(e) => setBidInput(e.target.value)}
                   aria-label="入札額 ETH"
-                  placeholder={formatEther(minNextBid)}
+                  placeholder={formatEther(minSend)}
                 />
               </div>
               <button
@@ -535,7 +578,11 @@ export default function App() {
                 disabled={!isConnected || writing || confirming}
                 onClick={onBid}
               >
-                {writing || confirming ? "処理中…" : "入札する"}
+                {writing || confirming
+                  ? "処理中…"
+                  : pendingAmt > 0n
+                    ? "追加入札する"
+                    : "入札する"}
               </button>
             </div>
           )}
@@ -564,7 +611,7 @@ export default function App() {
               disabled={!isConnected || writing}
               onClick={onWithdraw}
             >
-              返金を引き出す · {formatEther(pendingAmt)} ETH
+              預託を引き出す · {formatEther(pendingAmt)} ETH
             </button>
           )}
 
@@ -636,7 +683,7 @@ export default function App() {
           <ul>
             <li>入札は誰でも可能（Gi 不要）</li>
             <li>標準期間 3 日 · 終了間際は 15 分延長（アンチスナイプ）</li>
-            <li>更新入札で前の入札者は <code>withdraw</code> で返金</li>
+            <li>更新入札で前の入札者の ETH は<strong>預託</strong>に · 差分だけの追加入札 or 引出</li>
             <li>終了後、誰でも <code>settle</code> 可能 → ミント + 支払い</li>
           </ul>
         </details>
