@@ -9,7 +9,7 @@ export const CHAIN = baseSepolia;
 export const COLLECTION_ADDRESS =
   "0x4BE9e05b953849f13C0e27A257A8D89b4D221318" as Address;
 export const AUCTION_ADDRESS =
-  "0x21768633b05c8d66179DD6E815645Bb29941804d" as Address;
+  "0x2e21fbC98129886aa6F3AeF39ecBd513bDfeC12A" as Address;
 
 export const COLLECTION_ABI = collectionAbi as readonly unknown[];
 export const AUCTION_ABI = auctionAbi as readonly unknown[];

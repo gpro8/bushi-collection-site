@@ -25,7 +25,7 @@ export type LotInfo = {
 };
 
 const LOG_CHUNK = 1999n;
-const AUCTION_DEPLOY_BLOCK = 44_978_073n;
+const AUCTION_DEPLOY_BLOCK = 44_980_628n;
 const CHUNK_DELAY_MS = 100;
 /** First open: keep scanning until this many newest bids (not a time window). */
 const INITIAL_BID_TARGET = 5;

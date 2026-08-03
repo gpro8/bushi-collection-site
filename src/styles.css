@@ -440,6 +440,10 @@ a:hover {
 .admin-preview strong {
   color: var(--text);
 }
+.artist-changed {
+  color: #e8b84a;
+  font-weight: 600;
+}
 
 .stat-block {
   margin-bottom: 1.15rem;

@@ -725,7 +725,7 @@ export default function App() {
           <summary>まとめ</summary>
           <ul>
             <li>入札は誰でも可能（Gi 不要）</li>
-            <li>標準期間 3 日 · 終了間際は 15 分延長（アンチスナイプ）</li>
+            <li>標準期間 3 日 · 終了間際は <strong>+6 分加算</strong>（アンチスナイプ）</li>
             <li>更新入札で前の入札者の ETH は<strong>預託</strong>に · 差分だけの追加入札 or 引出</li>
             <li>終了後、誰でも <code>settle</code> 可能 → ミント + 支払い</li>
           </ul>

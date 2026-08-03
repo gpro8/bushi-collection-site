@@ -5,8 +5,9 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
   useSwitchChain,
+  usePublicClient,
 } from "wagmi";
-import { parseEther } from "viem";
+import { isAddress, parseEther, type Address, type Hash } from "viem";
 import {
   AUCTION_ABI,
   AUCTION_ADDRESS,
@@ -32,11 +33,19 @@ type StartMode = "now" | "hours" | "jst";
 export function AdminCreateAuction({ canCreate, onCreated }: Props) {
   const { address, isConnected, chainId } = useAccount();
   const { switchChain } = useSwitchChain();
+  const publicClient = usePublicClient({ chainId: CHAIN.id });
 
-  const { data: owner } = useReadContract({
+  const { data: owner, refetch: refetchOwner } = useReadContract({
     address: AUCTION_ADDRESS,
     abi: AUCTION_ABI,
     functionName: "owner",
+    chainId: CHAIN.id,
+  });
+
+  const { data: defaultArtistOnChain, refetch: refetchArtist } = useReadContract({
+    address: AUCTION_ADDRESS,
+    abi: AUCTION_ABI,
+    functionName: "defaultArtist",
     chainId: CHAIN.id,
   });
 
@@ -45,29 +54,35 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
     return String(owner).toLowerCase() === address.toLowerCase();
   }, [address, owner]);
 
+  const onChainArtist = String(defaultArtistOnChain || "");
+
   const [open, setOpen] = useState(false);
   const [tokenURI, setTokenURI] = useState("");
   const [durationSec, setDurationSec] = useState(0);
   const [reserveEth, setReserveEth] = useState("0");
   const [minIncEth, setMinIncEth] = useState("0");
+  const [artistInput, setArtistInput] = useState("");
   const [startMode, setStartMode] = useState<StartMode>("now");
   const [startHours, setStartHours] = useState("1");
   const [startJst, setStartJst] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [lastTx, setLastTx] = useState<Hash | undefined>();
 
-  const { writeContract, data: txHash, isPending, reset } = useWriteContract();
-  const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({
-    hash: txHash,
-  });
+  const { writeContractAsync, reset } = useWriteContract();
 
+  // Prefill artist from chain when opened / loaded
   useEffect(() => {
-    if (isSuccess) {
-      setMsg("createAuction 確認済み");
-      setTokenURI("");
-      onCreated?.();
-      reset();
+    if (onChainArtist && isAddress(onChainArtist)) {
+      setArtistInput((prev) => (prev ? prev : onChainArtist));
     }
-  }, [isSuccess, onCreated, reset]);
+  }, [onChainArtist]);
+
+  const artistChanged = useMemo(() => {
+    if (!onChainArtist || !artistInput) return false;
+    if (!isAddress(artistInput)) return false;
+    return artistInput.toLowerCase() !== onChainArtist.toLowerCase();
+  }, [artistInput, onChainArtist]);
 
   const previewStartUnix = useMemo(() => {
     const now = Math.floor(Date.now() / 1000);
@@ -82,9 +97,59 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
 
   if (!isConnected || !isOwner) return null;
 
+  const waitTx = async (hash: Hash) => {
+    setLastTx(hash);
+    if (!publicClient) throw new Error("RPC client なし");
+    await publicClient.waitForTransactionReceipt({ hash });
+  };
+
+  const ensureArtist = async (artist: Address) => {
+    if (!artistChanged) return false;
+    setMsg("受取ウォレット (defaultArtist) を更新中…");
+    const hash = await writeContractAsync({
+      address: AUCTION_ADDRESS,
+      abi: AUCTION_ABI,
+      functionName: "setDefaultArtist",
+      args: [artist],
+      chainId: CHAIN.id,
+    } as any);
+    await waitTx(hash);
+    await refetchArtist();
+    return true;
+  };
+
+  const onUpdateArtistOnly = async () => {
+    try {
+      setMsg(null);
+      setBusy(true);
+      if (chainId !== CHAIN.id) {
+        switchChain?.({ chainId: CHAIN.id });
+        setMsg("Base Sepolia に切り替えて再実行してください");
+        return;
+      }
+      const artist = artistInput.trim() as Address;
+      if (!isAddress(artist)) {
+        setMsg("有効な受取アドレス (0x…) を入力してください");
+        return;
+      }
+      if (!artistChanged) {
+        setMsg("オンチェーンと同じです — 更新不要");
+        return;
+      }
+      await ensureArtist(artist);
+      setMsg("defaultArtist を更新しました（次ロットの proceedsTo に反映）");
+      reset();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "エラー");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onSubmit = async () => {
     try {
       setMsg(null);
+      setBusy(true);
       if (chainId !== CHAIN.id) {
         switchChain?.({ chainId: CHAIN.id });
         setMsg("Base Sepolia に切り替えて再実行してください");
@@ -98,6 +163,16 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
       if (!uri) {
         setMsg("tokenURI を入力してください (ar://… または https://…)");
         return;
+      }
+      const artist = artistInput.trim() as Address;
+      if (!isAddress(artist)) {
+        setMsg("受取ウォレット (アーティスト) を入力してください");
+        return;
+      }
+
+      // Only call setDefaultArtist when changed → becomes proceedsTo at create
+      if (artistChanged) {
+        await ensureArtist(artist);
       }
 
       let startAt = 0n;
@@ -125,16 +200,29 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
 
       const reserve = parseEther(reserveEth || "0");
       const minInc = parseEther(minIncEth || "0");
-      writeContract({
+      setMsg(
+        artistChanged
+          ? "defaultArtist 更新済み · createAuction 送信中…"
+          : "createAuction 送信中…（受取ウォレット変更なし）"
+      );
+      const hash = await writeContractAsync({
         address: AUCTION_ADDRESS,
         abi: AUCTION_ABI,
         functionName: "createAuction",
         args: [uri, startAt, BigInt(durationSec), reserve, minInc],
         chainId: CHAIN.id,
       } as any);
-      setMsg("createAuction 送信中…");
+      await waitTx(hash);
+      setMsg("createAuction 確認済み · このロットの proceedsTo は作成時の defaultArtist");
+      setTokenURI("");
+      onCreated?.();
+      refetchOwner();
+      refetchArtist();
+      reset();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "エラー");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -150,15 +238,47 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
       {open && (
         <div className="admin-body">
           <p className="admin-hint">
-            オーナーのみ。開始時刻を今すぐ / N時間後 / JST日時で予約できます。
-            チェーンは UTC unix · 表示は JST。期間 0 = 既定 3日。増分 0 = 0.01 ETH。
-            予約後は開始時刻になると<strong>自動で入札可能</strong>（あなたがオンライン不要）。
+            オーナーのみ。受取ウォレットはロット作成時に{" "}
+            <strong>proceedsTo として固定</strong>（100%）。
+            オンチェーン defaultArtist と同じなら追加 tx なし。違う場合のみ
+            setDefaultArtist → createAuction。
           </p>
           {!canCreate && (
             <p className="status err">
               進行中のロットがあります — settle 完了後に新規作成できます。
             </p>
           )}
+
+          <label className="field">
+            <span>受取ウォレット（アーティスト · defaultArtist → proceedsTo）</span>
+            <input
+              value={artistInput}
+              onChange={(e) => setArtistInput(e.target.value.trim())}
+              placeholder="0x…"
+              spellCheck={false}
+            />
+          </label>
+          <p className="admin-preview">
+            オンチェーン現在:{" "}
+            <strong>
+              {onChainArtist ? `${onChainArtist.slice(0, 8)}…${onChainArtist.slice(-6)}` : "—"}
+            </strong>
+            {artistChanged ? (
+              <span className="artist-changed"> · 変更あり → 更新 tx を送ります</span>
+            ) : (
+              <span> · 変更なし（setDefaultArtist スキップ）</span>
+            )}
+          </p>
+          <button
+            type="button"
+            className="btn ghost wide"
+            disabled={busy || !artistChanged}
+            onClick={onUpdateArtistOnly}
+            style={{ marginBottom: "0.75rem" }}
+          >
+            受取ウォレットだけ更新（ロット作成しない）
+          </button>
+
           <label className="field">
             <span>tokenURI</span>
             <input
@@ -253,20 +373,20 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
           </div>
           <button
             className="btn primary wide"
-            disabled={!canCreate || isPending || confirming}
+            disabled={!canCreate || busy}
             onClick={onSubmit}
           >
-            {isPending || confirming ? "処理中…" : "オークションを作成"}
+            {busy ? "処理中…" : "オークションを作成"}
           </button>
           {msg && <p className="status">{msg}</p>}
-          {txHash && (
+          {lastTx && (
             <p className="status">
               <a
-                href={`${EXPLORER}/tx/${txHash}`}
+                href={`${EXPLORER}/tx/${lastTx}`}
                 target="_blank"
                 rel="noreferrer"
               >
-                Tx {txHash.slice(0, 12)}…
+                Tx {lastTx.slice(0, 12)}…
               </a>
             </p>
           )}
