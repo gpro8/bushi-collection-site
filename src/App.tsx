@@ -20,6 +20,7 @@ import {
   EXPLORER,
   arweaveToHttp,
 } from "./config";
+import { fmtCountdown, fmtJst } from "./timeJst";
 
 type AuctionState = {
   id: bigint;
@@ -40,25 +41,13 @@ function shortAddr(a?: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
-function useCountdown(endSec: number) {
+function useNowSec() {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
     const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(t);
   }, []);
-  const left = Math.max(0, endSec - now);
-  const h = Math.floor(left / 3600);
-  const m = Math.floor((left % 3600) / 60);
-  const s = left % 60;
-  return {
-    left,
-    label:
-      endSec <= 0
-        ? "—"
-        : left === 0
-          ? "終了"
-          : `${h}時間 ${m}分 ${s.toString().padStart(2, "0")}秒`,
-  };
+  return now;
 }
 
 type NftAttr = { trait_type?: string; value?: string | number; display_type?: string };
@@ -222,7 +211,29 @@ export default function App() {
   }, [stateRaw]);
 
   const endSec = state ? Number(state.endTime) : 0;
-  const { left, label: countdown } = useCountdown(endSec);
+  const startSec = state ? Number(state.startTime) : 0;
+  const nowSec = useNowSec();
+  const isScheduled =
+    !!state &&
+    !state.settled &&
+    startSec > 0 &&
+    nowSec < startSec;
+  const isEnded =
+    !!state &&
+    !state.settled &&
+    startSec > 0 &&
+    nowSec >= endSec;
+  const countdownTarget = isScheduled ? startSec : endSec;
+  const countdownLeft = Math.max(0, countdownTarget - nowSec);
+  const countdownLabel = state?.settled
+    ? "Settled"
+    : countdownTarget <= 0
+      ? "—"
+      : countdownLeft === 0
+        ? isScheduled
+          ? "まもなく開始"
+          : "終了"
+        : fmtCountdown(countdownLeft);
 
   const [artUrl, setArtUrl] = useState("");
   const [meta, setMeta] = useState<NftMeta>({});
@@ -385,8 +396,8 @@ export default function App() {
     [desc]
   );
   const descShown = descOpen ? desc : descPreview;
-  const canSettle = state && !state.live && !state.settled && state.startTime > 0n;
-  const showBid = state?.live;
+  const canSettle = isEnded;
+  const showBid = state?.live === true;
   const pendingAmt = (pending as bigint | undefined) ?? 0n;
   // New lot only when none active (never started or already settled)
   const canCreateAuction =
@@ -484,12 +495,29 @@ export default function App() {
               ? "ライブオークション"
               : state?.settled
                 ? "落札済み"
-                : state && state.startTime > 0n
-                  ? "終了 — settle 待ち"
-                  : "準備中"}
+                : isScheduled
+                  ? "開始予定"
+                  : isEnded
+                    ? "終了 — settle 待ち"
+                    : state && state.startTime > 0n
+                      ? "終了 — settle 待ち"
+                      : "準備中"}
           </p>
           {lotLabel && <p className="lot-label">{lotLabel}</p>}
           <h1>{title}</h1>
+
+          {state && state.startTime > 0n && (
+            <div className="time-jst-block">
+              <div>
+                <span className="time-jst-label">開始</span>{" "}
+                <strong>{fmtJst(state.startTime)}</strong>
+              </div>
+              <div>
+                <span className="time-jst-label">終了</span>{" "}
+                <strong>{fmtJst(state.endTime)}</strong>
+              </div>
+            </div>
+          )}
 
           {desc && (
             <div className="meta-desc">
@@ -530,16 +558,31 @@ export default function App() {
 
           <div className="stat-block">
             <div className="stat-label">
-              {state?.live
-                ? "オークション終了まで"
-                : state?.settled
-                  ? "ステータス"
-                  : "カウントダウン"}
+              {state?.settled
+                ? "ステータス"
+                : isScheduled
+                  ? "オークション開始まで"
+                  : state?.live
+                    ? "オークション終了まで"
+                    : isEnded
+                      ? "ステータス"
+                      : "カウントダウン"}
             </div>
             <div className="stat-value countdown">
-              {state?.settled ? "Settled" : countdown}
+              {state?.settled
+                ? "Settled"
+                : isEnded
+                  ? "終了 · settle 待ち"
+                  : countdownLabel}
             </div>
           </div>
+
+          {isScheduled && (
+            <p className="schedule-note">
+              開始時刻になると自動で入札可能になります（運営の操作不要）。
+              初回入札でオンチェーン記録を残そう。
+            </p>
+          )}
 
           {showBid && (
             <div className="bid-row">
@@ -601,7 +644,7 @@ export default function App() {
               disabled={!isConnected || writing || confirming}
               onClick={onSettle}
             >
-              {left === 0 || !state?.live ? "settle（ミント実行）" : "settle"}
+              settle（ミント実行）
             </button>
           )}
 

@@ -13,19 +13,21 @@ import {
   CHAIN,
   EXPLORER,
 } from "./config";
+import { fmtJst, jstLocalInputToUnix } from "./timeJst";
 
 type Props = {
-  /** Current lot settled or never started → can create */
   canCreate: boolean;
   onCreated?: () => void;
 };
 
-const PRESETS: { label: string; seconds: number }[] = [
+const DURATION_PRESETS: { label: string; seconds: number }[] = [
   { label: "既定 (3日)", seconds: 0 },
   { label: "5分 (テスト)", seconds: 300 },
   { label: "1時間", seconds: 3600 },
   { label: "3日", seconds: 3 * 24 * 3600 },
 ];
+
+type StartMode = "now" | "hours" | "jst";
 
 export function AdminCreateAuction({ canCreate, onCreated }: Props) {
   const { address, isConnected, chainId } = useAccount();
@@ -48,6 +50,9 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
   const [durationSec, setDurationSec] = useState(0);
   const [reserveEth, setReserveEth] = useState("0");
   const [minIncEth, setMinIncEth] = useState("0");
+  const [startMode, setStartMode] = useState<StartMode>("now");
+  const [startHours, setStartHours] = useState("1");
+  const [startJst, setStartJst] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
 
   const { writeContract, data: txHash, isPending, reset } = useWriteContract();
@@ -63,6 +68,17 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
       reset();
     }
   }, [isSuccess, onCreated, reset]);
+
+  const previewStartUnix = useMemo(() => {
+    const now = Math.floor(Date.now() / 1000);
+    if (startMode === "now") return now;
+    if (startMode === "hours") {
+      const h = Number(startHours);
+      if (!Number.isFinite(h) || h < 0) return null;
+      return now + Math.floor(h * 3600);
+    }
+    return jstLocalInputToUnix(startJst);
+  }, [startMode, startHours, startJst]);
 
   if (!isConnected || !isOwner) return null;
 
@@ -83,13 +99,37 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
         setMsg("tokenURI を入力してください (ar://… または https://…)");
         return;
       }
+
+      let startAt = 0n;
+      if (startMode === "now") {
+        startAt = 0n;
+      } else if (startMode === "hours") {
+        const h = Number(startHours);
+        if (!Number.isFinite(h) || h <= 0) {
+          setMsg("開始までの時間を正しく入力してください");
+          return;
+        }
+        startAt = BigInt(Math.floor(Date.now() / 1000) + Math.floor(h * 3600));
+      } else {
+        const u = jstLocalInputToUnix(startJst);
+        if (u == null) {
+          setMsg("開始日時 (JST) を入力してください");
+          return;
+        }
+        if (u <= Math.floor(Date.now() / 1000)) {
+          setMsg("開始日時は現在より後にしてください");
+          return;
+        }
+        startAt = BigInt(u);
+      }
+
       const reserve = parseEther(reserveEth || "0");
       const minInc = parseEther(minIncEth || "0");
       writeContract({
         address: AUCTION_ADDRESS,
         abi: AUCTION_ABI,
         functionName: "createAuction",
-        args: [uri, BigInt(durationSec), reserve, minInc],
+        args: [uri, startAt, BigInt(durationSec), reserve, minInc],
         chainId: CHAIN.id,
       } as any);
       setMsg("createAuction 送信中…");
@@ -110,8 +150,9 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
       {open && (
         <div className="admin-body">
           <p className="admin-hint">
-            オーナーのみ表示。URI は最終メタデータ（JSON）を推奨。期間 0 =
-            コントラクト既定（3日）。最小入札増分 0 = 既定 0.01 ETH。
+            オーナーのみ。開始時刻を今すぐ / N時間後 / JST日時で予約できます。
+            チェーンは UTC unix · 表示は JST。期間 0 = 既定 3日。増分 0 = 0.01 ETH。
+            予約後は開始時刻になると<strong>自動で入札可能</strong>（あなたがオンライン不要）。
           </p>
           {!canCreate && (
             <p className="status err">
@@ -127,13 +168,65 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
               spellCheck={false}
             />
           </label>
+
+          <fieldset className="field start-mode">
+            <legend>開始タイミング</legend>
+            <label className="radio">
+              <input
+                type="radio"
+                checked={startMode === "now"}
+                onChange={() => setStartMode("now")}
+              />
+              今すぐ
+            </label>
+            <label className="radio">
+              <input
+                type="radio"
+                checked={startMode === "hours"}
+                onChange={() => setStartMode("hours")}
+              />
+              N 時間後
+            </label>
+            {startMode === "hours" && (
+              <input
+                type="number"
+                min={0.1}
+                step={0.5}
+                value={startHours}
+                onChange={(e) => setStartHours(e.target.value)}
+                placeholder="例: 24"
+                style={{ maxWidth: "8rem" }}
+              />
+            )}
+            <label className="radio">
+              <input
+                type="radio"
+                checked={startMode === "jst"}
+                onChange={() => setStartMode("jst")}
+              />
+              JST 日時
+            </label>
+            {startMode === "jst" && (
+              <input
+                type="datetime-local"
+                value={startJst}
+                onChange={(e) => setStartJst(e.target.value)}
+              />
+            )}
+            {previewStartUnix != null && (
+              <p className="admin-preview">
+                開始予定: <strong>{fmtJst(previewStartUnix)}</strong>
+              </p>
+            )}
+          </fieldset>
+
           <label className="field">
-            <span>期間</span>
+            <span>入札期間（開始後）</span>
             <select
               value={durationSec}
               onChange={(e) => setDurationSec(Number(e.target.value))}
             >
-              {PRESETS.map((p) => (
+              {DURATION_PRESETS.map((p) => (
                 <option key={p.label} value={p.seconds}>
                   {p.label}
                 </option>
