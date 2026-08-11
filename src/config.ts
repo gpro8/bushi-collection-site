@@ -1,25 +1,25 @@
 import type { Address } from "viem";
-import { baseSepolia } from "viem/chains";
 import collectionAbi from "./abi/BushiCollection.json";
 import auctionAbi from "./abi/BushiCollectionAuction.json";
+import { activeDeployment } from "./deployments";
 
-/** Base Sepolia (84532) — Phase 2 target */
-export const CHAIN = baseSepolia;
+const d = activeDeployment();
 
-export const COLLECTION_ADDRESS =
-  "0x4BE9e05b953849f13C0e27A257A8D89b4D221318" as Address;
-export const AUCTION_ADDRESS =
-  "0x2e21fbc98129886AA6F3AEF39ECbd513BDFEc12A" as Address;
+export const CHAIN = d.chain;
+export const COLLECTION_ADDRESS = d.collection as Address;
+export const AUCTION_ADDRESS = d.auction as Address;
+/** Log scan floor for bid history / lot list */
+export const AUCTION_DEPLOY_BLOCK = d.auctionDeployBlock;
+export const NETWORK_LABEL = d.label;
 
 export const COLLECTION_ABI = collectionAbi as readonly unknown[];
 export const AUCTION_ABI = auctionAbi as readonly unknown[];
 
-/** Public RPC — override with VITE_RPC_URL for Alchemy */
+/** Public RPC — override with VITE_RPC_URL (Alchemy recommended on mainnet) */
 export const RPC_URL =
-  (import.meta.env.VITE_RPC_URL as string | undefined) ||
-  "https://sepolia.base.org";
+  (import.meta.env.VITE_RPC_URL as string | undefined) || d.rpcFallback;
 
-export const EXPLORER = "https://sepolia.basescan.org";
+export const EXPLORER = d.explorer;
 
 export function arweaveToHttp(uri: string): string {
   if (!uri) return "";

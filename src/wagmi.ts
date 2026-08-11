@@ -1,12 +1,11 @@
 import { http, createConfig } from "wagmi";
-import { baseSepolia } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
-import { RPC_URL } from "./config";
+import { CHAIN, RPC_URL } from "./config";
 
 export const wagmiConfig = createConfig({
-  chains: [baseSepolia],
+  chains: [CHAIN],
   connectors: [injected({ shimDisconnect: true })],
   transports: {
-    [baseSepolia.id]: http(RPC_URL),
+    [CHAIN.id]: http(RPC_URL),
   },
 });

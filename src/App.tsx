@@ -18,6 +18,7 @@ import {
   COLLECTION_ABI,
   COLLECTION_ADDRESS,
   EXPLORER,
+  NETWORK_LABEL,
   arweaveToHttp,
 } from "./config";
 import { fmtCountdown, fmtJst } from "./timeJst";
@@ -423,7 +424,7 @@ export default function App() {
           <span className="logo">武</span>
           <div>
             <div className="brand-name">Bushi Collection</div>
-            <div className="brand-sub">Base Sepolia · English Auction</div>
+            <div className="brand-sub">{NETWORK_LABEL} · English Auction</div>
           </div>
         </div>
         <nav className="nav">
