@@ -431,7 +431,7 @@ export default function App() {
             type="button"
             className="theme-toggle"
             onClick={() => setTheme((t) => toggleTheme(t))}
-            aria-label={theme === "dark" ? "陽モード" : "陰モード"}
+            aria-label={theme === "dark" ? "陽" : "陰"}
             title={theme === "dark" ? "陽" : "陰"}
           >
             {theme === "dark" ? (
@@ -444,9 +444,6 @@ export default function App() {
                 <path d="M18.5 14.2A7.2 7.2 0 0 1 9.8 5.5 6.6 6.6 0 1 0 18.5 14.2Z" />
               </svg>
             )}
-            <span className="theme-yin-yang" aria-hidden>
-              {theme === "dark" ? "陽" : "陰"}
-            </span>
           </button>
           <a
             href={`${EXPLORER}/address/${COLLECTION_ADDRESS}`}
@@ -464,11 +461,27 @@ export default function App() {
           </a>
           {!isConnected ? (
             <button
-              className="btn primary"
+              className="btn primary btn-connect"
               disabled={connecting}
               onClick={() => connect({ connector: connectors[0] })}
+              aria-label={connecting ? "接続中" : "接続する"}
+              title={connecting ? "接続中" : "接続する"}
             >
-              {connecting ? "…" : "接続する"}
+              <svg
+                className="btn-connect-ico"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                aria-hidden
+              >
+                <path d="M4 8.5h13.5a2.5 2.5 0 0 1 0 5H16" />
+                <path d="M4 8.5V16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5" />
+                <rect x="15" y="11.5" width="3.5" height="2.5" rx="0.6" />
+              </svg>
+              <span className="btn-connect-label">
+                {connecting ? "…" : "接続する"}
+              </span>
             </button>
           ) : (
             <button className="btn ghost" onClick={() => disconnect()}>
