@@ -431,8 +431,8 @@ export default function App() {
             type="button"
             className="theme-toggle"
             onClick={() => setTheme((t) => toggleTheme(t))}
-            aria-label={theme === "dark" ? "ライトモード" : "ダークモード"}
-            title={theme === "dark" ? "ライトモード" : "ダークモード"}
+            aria-label={theme === "dark" ? "陽モード" : "陰モード"}
+            title={theme === "dark" ? "陽" : "陰"}
           >
             {theme === "dark" ? (
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
@@ -444,6 +444,9 @@ export default function App() {
                 <path d="M18.5 14.2A7.2 7.2 0 0 1 9.8 5.5 6.6 6.6 0 1 0 18.5 14.2Z" />
               </svg>
             )}
+            <span className="theme-yin-yang" aria-hidden>
+              {theme === "dark" ? "陽" : "陰"}
+            </span>
           </button>
           <a
             href={`${EXPLORER}/address/${COLLECTION_ADDRESS}`}
