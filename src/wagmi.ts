@@ -1,11 +1,15 @@
 import { http, createConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
+import type { Chain } from "viem";
 import { CHAIN, RPC_URL } from "./config";
 
+/** Single active chain (Sepolia or Base) from deployments. */
+const chain = CHAIN as Chain;
+
 export const wagmiConfig = createConfig({
-  chains: [CHAIN],
+  chains: [chain],
   connectors: [injected({ shimDisconnect: true })],
   transports: {
-    [CHAIN.id]: http(RPC_URL),
+    [chain.id]: http(RPC_URL),
   },
 });
