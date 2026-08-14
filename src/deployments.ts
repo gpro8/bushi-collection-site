@@ -32,16 +32,16 @@ export const sepoliaDeployment: AuctionDeployment = {
 };
 
 /**
- * Base mainnet — fill after deploy; keep zero-address until GO.
- * Site stays on Sepolia while these are unset.
+ * Base mainnet — LIVE 2026-08-10
+ * Deployer B1 · pendingOwner Safe · block 49976410
  */
 export const mainnetDeployment: AuctionDeployment = {
   id: "mainnet",
   chain: base,
-  collection: "0x0000000000000000000000000000000000000000",
-  auction: "0x0000000000000000000000000000000000000000",
-  auctionDeployBlock: 0n,
-  defaultArtist: "0x0000000000000000000000000000000000000000",
+  collection: "0xbb956e810AA45799760E07775AeaAcd327334BC7",
+  auction: "0x5Da0Af241fCE4D6E2bB5E021F2ce8706E830a202",
+  auctionDeployBlock: 49_976_410n,
+  defaultArtist: "0xC88b9Be50638361d4A1e2c52802fa2F78932170E",
   rpcFallback: "https://mainnet.base.org",
   explorer: "https://basescan.org",
   label: "Base",
@@ -51,13 +51,20 @@ function isZero(a: string) {
   return !a || /^0x0{40}$/i.test(a);
 }
 
-/** Active deployment. Prefer VITE_NETWORK=mainnet only after addresses set. */
+/**
+ * Active deployment.
+ * Default: **mainnet** when addresses are set.
+ * Override: VITE_NETWORK=sepolia for dogfood.
+ */
 export function activeDeployment(): AuctionDeployment {
   const want = (import.meta.env.VITE_NETWORK as string | undefined)?.toLowerCase();
-  if (want === "mainnet" || want === "base") {
+  if (want === "sepolia" || want === "testnet") {
+    return sepoliaDeployment;
+  }
+  if (want === "mainnet" || want === "base" || !want) {
     if (isZero(mainnetDeployment.collection) || isZero(mainnetDeployment.auction)) {
       console.warn(
-        "[bushi-collection] VITE_NETWORK=mainnet but addresses empty — falling back to Sepolia"
+        "[bushi-collection] mainnet addresses empty — falling back to Sepolia"
       );
       return sepoliaDeployment;
     }
