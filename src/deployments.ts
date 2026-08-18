@@ -32,15 +32,16 @@ export const sepoliaDeployment: AuctionDeployment = {
 };
 
 /**
- * Base mainnet — LIVE 2026-08-10
- * Deployer B1 · pendingOwner Safe · block 49976410
+ * Base mainnet — A1 LIVE 2026-08-18 (`_mint`)
+ * Safe owner · block 50118673
+ * A0 0xbb95… / 0x5Da0… retired — do not lot
  */
 export const mainnetDeployment: AuctionDeployment = {
   id: "mainnet",
   chain: base,
-  collection: "0xbb956e810AA45799760E07775AeaAcd327334BC7",
-  auction: "0x5Da0Af241fCE4D6E2bB5E021F2ce8706E830a202",
-  auctionDeployBlock: 49_976_410n,
+  collection: "0x7081697320B69c9cfBC5b733668b4D141CEa9149",
+  auction: "0x7e8bFB5126A74127Cd0011726741a17E56093fAC",
+  auctionDeployBlock: 50_118_673n,
   defaultArtist: "0xC88b9Be50638361d4A1e2c52802fa2F78932170E",
   rpcFallback: "https://mainnet.base.org",
   explorer: "https://basescan.org",
