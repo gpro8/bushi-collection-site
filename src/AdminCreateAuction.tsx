@@ -3,9 +3,9 @@ import {
   useAccount,
   useReadContract,
   useWriteContract,
-  useWaitForTransactionReceipt,
   useSwitchChain,
   usePublicClient,
+  useWalletClient,
 } from "wagmi";
 import { isAddress, parseEther, type Address, type Hash } from "viem";
 import {
@@ -15,6 +15,12 @@ import {
   EXPLORER,
 } from "./config";
 import { fmtJst, jstLocalInputToUnix } from "./timeJst";
+import {
+  encodeAuctionCall,
+  proposeSafeCall,
+  readSafeOwners,
+  readSafeThreshold,
+} from "./safePropose";
 
 type Props = {
   canCreate: boolean;
@@ -34,6 +40,7 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
   const { address, isConnected, chainId } = useAccount();
   const { switchChain } = useSwitchChain();
   const publicClient = usePublicClient({ chainId: CHAIN.id });
+  const { data: walletClient } = useWalletClient({ chainId: CHAIN.id });
 
   const { data: owner, refetch: refetchOwner } = useReadContract({
     address: AUCTION_ADDRESS,
@@ -49,10 +56,45 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
     chainId: CHAIN.id,
   });
 
-  const isOwner = useMemo(() => {
+  const [safeOwners, setSafeOwners] = useState<Address[] | null>(null);
+  const [safeThreshold, setSafeThreshold] = useState(0);
+  const [queueUrl, setQueueUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!publicClient || !owner) {
+        setSafeOwners(null);
+        return;
+      }
+      const owners = await readSafeOwners(publicClient, owner as Address);
+      if (cancelled) return;
+      setSafeOwners(owners);
+      if (owners) {
+        setSafeThreshold(await readSafeThreshold(publicClient, owner as Address));
+      } else {
+        setSafeThreshold(0);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [publicClient, owner]);
+
+  const isEoaOwner = useMemo(() => {
     if (!address || !owner) return false;
     return String(owner).toLowerCase() === address.toLowerCase();
   }, [address, owner]);
+
+  const isSafeSigner = useMemo(() => {
+    if (!address || !safeOwners) return false;
+    const me = address.toLowerCase();
+    return safeOwners.some((o) => o.toLowerCase() === me);
+  }, [address, safeOwners]);
+
+  const canAdmin = isEoaOwner || isSafeSigner;
+  const viaSafe = isSafeSigner && !isEoaOwner;
 
   const onChainArtist = String(defaultArtistOnChain || "");
 
@@ -95,7 +137,9 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
     return jstLocalInputToUnix(startJst);
   }, [startMode, startHours, startJst]);
 
-  if (!isConnected || !isOwner) return null;
+  if (!isConnected || !canAdmin) return null;
+
+  const chainLabel = CHAIN.id === 8453 ? "Base" : "Base Sepolia";
 
   const waitTx = async (hash: Hash) => {
     setLastTx(hash);
@@ -103,8 +147,31 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
     await publicClient.waitForTransactionReceipt({ hash });
   };
 
+  const proposeToSafe = async (data: `0x${string}`) => {
+    if (!publicClient || !walletClient || !address || !owner) {
+      throw new Error("ウォレット / RPC が足りません");
+    }
+    const result = await proposeSafeCall({
+      chainId: CHAIN.id,
+      safe: owner as Address,
+      to: AUCTION_ADDRESS,
+      data,
+      publicClient,
+      walletClient,
+      sender: address,
+    });
+    setQueueUrl(result.queueUrl);
+    return result;
+  };
+
   const ensureArtist = async (artist: Address) => {
     if (!artistChanged) return false;
+    if (viaSafe) {
+      setMsg("受取ウォレット変更を Safe に提案中…");
+      const data = encodeAuctionCall(AUCTION_ABI, "setDefaultArtist", [artist]);
+      await proposeToSafe(data);
+      return true;
+    }
     setMsg("受取ウォレット (defaultArtist) を更新中…");
     const hash = await writeContractAsync({
       address: AUCTION_ADDRESS,
@@ -124,7 +191,7 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
       setBusy(true);
       if (chainId !== CHAIN.id) {
         switchChain?.({ chainId: CHAIN.id });
-        setMsg("Base Sepolia に切り替えて再実行してください");
+        setMsg(`${chainLabel} に切り替えて再実行してください`);
         return;
       }
       const artist = artistInput.trim() as Address;
@@ -137,7 +204,11 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
         return;
       }
       await ensureArtist(artist);
-      setMsg("defaultArtist を更新しました（次ロットの proceedsTo に反映）");
+      setMsg(
+        viaSafe
+          ? `defaultArtist を Safe キューに提案しました（${safeThreshold || 3}-of-5）`
+          : "defaultArtist を更新しました（次ロットの proceedsTo に反映）"
+      );
       reset();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "エラー");
@@ -152,7 +223,7 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
       setBusy(true);
       if (chainId !== CHAIN.id) {
         switchChain?.({ chainId: CHAIN.id });
-        setMsg("Base Sepolia に切り替えて再実行してください");
+        setMsg(`${chainLabel} に切り替えて再実行してください`);
         return;
       }
       if (!canCreate) {
@@ -200,6 +271,27 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
 
       const reserve = parseEther(reserveEth || "0");
       const minInc = parseEther(minIncEth || "0");
+      const args = [uri, startAt, BigInt(durationSec), reserve, minInc] as const;
+
+      if (viaSafe) {
+        setMsg(
+          artistChanged
+            ? "createAuction を Safe に提案中…"
+            : "createAuction を Safe に提案中…（受取ウォレット変更なし）"
+        );
+        const data = encodeAuctionCall(AUCTION_ABI, "createAuction", [...args]);
+        await proposeToSafe(data);
+        setMsg(
+          `Safe キューに提案しました。他の署名者が確認すると実行されます（${safeThreshold || 3}-of-5）。`
+        );
+        setTokenURI("");
+        onCreated?.();
+        refetchOwner();
+        refetchArtist();
+        reset();
+        return;
+      }
+
       setMsg(
         artistChanged
           ? "defaultArtist 更新済み · createAuction 送信中…"
@@ -209,7 +301,7 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
         address: AUCTION_ADDRESS,
         abi: AUCTION_ABI,
         functionName: "createAuction",
-        args: [uri, startAt, BigInt(durationSec), reserve, minInc],
+        args,
         chainId: CHAIN.id,
       } as any);
       await waitTx(hash);
@@ -238,10 +330,20 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
       {open && (
         <div className="admin-body">
           <p className="admin-hint">
-            オーナーのみ。受取ウォレットはロット作成時に{" "}
-            <strong>proceedsTo として固定</strong>（100%）。
-            オンチェーン defaultArtist と同じなら追加 tx なし。違う場合のみ
-            setDefaultArtist → createAuction。
+            {viaSafe ? (
+              <>
+                Safe オーナーのみ。送信は <strong>キューへの提案</strong>（実行ではない）。
+                閾値 <strong>{safeThreshold || 3}-of-5</strong> の署名後にロットが立ちます。
+                受取ウォレットを変えると提案が 2 件（setDefaultArtist → createAuction）。
+              </>
+            ) : (
+              <>
+                オーナーのみ。受取ウォレットはロット作成時に{" "}
+                <strong>proceedsTo として固定</strong>（100%）。
+                オンチェーン defaultArtist と同じなら追加 tx なし。違う場合のみ
+                setDefaultArtist → createAuction。
+              </>
+            )}
           </p>
           {!canCreate && (
             <p className="status err">
@@ -264,7 +366,10 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
               {onChainArtist ? `${onChainArtist.slice(0, 8)}…${onChainArtist.slice(-6)}` : "—"}
             </strong>
             {artistChanged ? (
-              <span className="artist-changed"> · 変更あり → 更新 tx を送ります</span>
+              <span className="artist-changed">
+                {" "}
+                · 変更あり → {viaSafe ? "Safe に更新を提案" : "更新 tx を送ります"}
+              </span>
             ) : (
               <span> · 変更なし（setDefaultArtist スキップ）</span>
             )}
@@ -376,9 +481,16 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
             disabled={!canCreate || busy}
             onClick={onSubmit}
           >
-            {busy ? "処理中…" : "オークションを作成"}
+            {busy ? "処理中…" : viaSafe ? "Safe に提案する" : "オークションを作成"}
           </button>
           {msg && <p className="status">{msg}</p>}
+          {queueUrl && (
+            <p className="status">
+              <a href={queueUrl} target="_blank" rel="noreferrer">
+                Safe キューを開く
+              </a>
+            </p>
+          )}
           {lastTx && (
             <p className="status">
               <a
