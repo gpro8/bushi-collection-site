@@ -621,6 +621,31 @@ export default function App() {
             </p>
           )}
 
+          <div className="bridge-help">
+            <div className="bridge-help-title">入札の前に · Base 上の ETH</div>
+            <p>
+              入札は <strong>Base</strong> の ETH のみです。Ethereum
+              など別チェーンの ETH は、ご自身で同じウォレットアドレスへ移してから入札してください。運営はブリッジを代行しません。
+            </p>
+            <ul>
+              <li>
+                Coinbase 口座がある場合: アプリから ETH を{" "}
+                <strong>Base</strong> ネットワークで自分のアドレスへ送る
+              </li>
+              <li>
+                <a
+                  href="https://superbridge.app/base"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Superbridge
+                </a>
+                {" "}
+                （Ethereum → Base · 公式エコシステム案内）
+              </li>
+            </ul>
+          </div>
+
           {showBid && (
             <div className="bid-row">
               <div className="bid-head">
@@ -756,15 +781,29 @@ export default function App() {
         <p>
           <strong>Bushi Collection</strong> は Base 上の English
           オークションです。1点ずつ出品され、最高入札者が settle 後に NFT
-          を受け取ります。売上はアーティストへ 100%（ロット作成時に固定）。
+          を受け取ります。売上はクリエイターへ 100%（ロット作成時に固定）。
+        </p>
+        <p>
+          落札したキャラクターは{" "}
+          <a
+            href="https://gpro8.github.io/bushi-bukan-site/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            武鑑
+          </a>
+          （BushiDAO の名刺）に掲げられます。
         </p>
         <details>
           <summary>まとめ</summary>
           <ul>
             <li>入札は誰でも可能（Gi 不要）</li>
+            <li>入札は Base 上の ETH · 他チェーンからはご自身でブリッジ</li>
             <li>標準期間 3 日 · 終了間際は <strong>+6 分加算</strong>（アンチスナイプ）</li>
             <li>更新入札で前の入札者の ETH は<strong>預託</strong>に · 差分だけの追加入札 or 引出</li>
             <li>終了後、誰でも <code>settle</code> 可能 → ミント + 支払い</li>
+            <li>売上はクリエイターへ 100%</li>
+            <li>落札キャラクターは武鑑に表示</li>
           </ul>
         </details>
       </section>

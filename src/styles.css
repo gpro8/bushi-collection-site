@@ -552,6 +552,33 @@ a:hover {
   line-height: 1.45;
 }
 
+.bridge-help {
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.bridge-help-title {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+  font-size: 0.86rem;
+}
+.bridge-help p {
+  margin: 0 0 0.45rem;
+}
+.bridge-help ul {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+.bridge-help a {
+  color: var(--accent);
+}
+
 .admin .start-mode {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -695,6 +722,9 @@ a:hover {
 .about ul {
   margin: 0.5rem 0 0;
   padding-left: 1.2rem;
+}
+.about a {
+  color: var(--accent);
 }
 .about code {
   font-size: 0.85em;

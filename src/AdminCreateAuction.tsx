@@ -237,7 +237,7 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
       }
       const artist = artistInput.trim() as Address;
       if (!isAddress(artist)) {
-        setMsg("受取ウォレット (アーティスト) を入力してください");
+        setMsg("受取ウォレット (クリエイター) を入力してください");
         return;
       }
 
@@ -352,7 +352,7 @@ export function AdminCreateAuction({ canCreate, onCreated }: Props) {
           )}
 
           <label className="field">
-            <span>受取ウォレット（アーティスト · defaultArtist → proceedsTo）</span>
+            <span>受取ウォレット（クリエイター · defaultArtist → proceedsTo）</span>
             <input
               value={artistInput}
               onChange={(e) => setArtistInput(e.target.value.trim())}
