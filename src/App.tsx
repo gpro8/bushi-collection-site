@@ -421,7 +421,13 @@ export default function App() {
     <div className="page">
       <header className="top">
         <div className="brand">
-          <span className="logo">武</span>
+          <img
+            className="logo"
+            src={`${import.meta.env.BASE_URL}collection-mark.svg`}
+            width={42}
+            height={42}
+            alt=""
+          />
           <div>
             <div className="brand-name">Bushi Collection</div>
             <div className="brand-sub">{NETWORK_LABEL} · English Auction</div>

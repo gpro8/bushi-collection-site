@@ -111,15 +111,10 @@ a:hover {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(145deg, var(--logo-from), var(--logo-to));
+  display: block;
+  object-fit: cover;
+  background: #1b1916;
   border: 1px solid var(--logo-border, var(--border));
-  color: var(--logo-fg, var(--accent-hi));
-  font-weight: 800;
-  font-size: 1.2rem;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-  letter-spacing: 0.02em;
 }
 
 .brand-name {
