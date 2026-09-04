@@ -424,8 +424,8 @@ export default function App() {
           <img
             className="logo"
             src={`${import.meta.env.BASE_URL}collection-mark.svg`}
-            width={42}
-            height={42}
+            width={44}
+            height={44}
             alt=""
           />
           <div>

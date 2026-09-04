@@ -108,13 +108,12 @@ a:hover {
 }
 
 .logo {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
   display: block;
-  object-fit: cover;
-  background: #1b1916;
-  border: 1px solid var(--logo-border, var(--border));
+  object-fit: contain;
+  background: transparent;
+  border: 0;
 }
 
 .brand-name {
