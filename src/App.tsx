@@ -44,6 +44,46 @@ function shortAddr(a?: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
 }
 
+function collectionSiteUrl() {
+  if (typeof window === "undefined") {
+    return "https://gpro8.github.io/bushi-collection-site/";
+  }
+  const path = window.location.pathname.replace(/index\.html$/i, "");
+  const base = path.endsWith("/") ? path : `${path}/`;
+  return `${window.location.origin}${base}`;
+}
+
+function xIntentUrl(text: string): string {
+  const u = new URL("https://twitter.com/intent/tweet");
+  u.searchParams.set("text", text);
+  return u.toString();
+}
+
+function buildAuctionShare(opts: {
+  title: string;
+  bidEth: string;
+  endJst: string;
+  live: boolean;
+  role: "highest" | "in" | "watch";
+}): string {
+  const url = collectionSiteUrl();
+  const head =
+    opts.role === "highest"
+      ? "武士コレで最高入札しています"
+      : opts.role === "in"
+        ? "武士コレの入札に参加しています"
+        : opts.live
+          ? "武士コレ 開催中"
+          : "武士コレ";
+  const lines = [head, opts.title];
+  if (opts.bidEth && opts.bidEth !== "0") {
+    lines.push(`現在 Ξ ${opts.bidEth}`);
+  }
+  if (opts.endJst) lines.push(`終了 ${opts.endJst}`);
+  lines.push(url);
+  return lines.join("\n");
+}
+
 function useNowSec() {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   useEffect(() => {
@@ -604,16 +644,43 @@ export default function App() {
               最高入札者 {shortAddr(state?.highestBidder)}
             </div>
             {state && state.id > 0n && (
-              <button
-                type="button"
-                className="bid-history-btn"
-                onClick={() => setBidHistoryOpen(true)}
-              >
-                <span className="bid-history-ico" aria-hidden>
-                  ≡
-                </span>
-                入札履歴
-              </button>
+              <div className="lot-actions">
+                <button
+                  type="button"
+                  className="bid-history-btn"
+                  onClick={() => setBidHistoryOpen(true)}
+                >
+                  <span className="bid-history-ico" aria-hidden>
+                    ≡
+                  </span>
+                  入札履歴
+                </button>
+                <a
+                  className="bid-history-btn"
+                  href={xIntentUrl(
+                    buildAuctionShare({
+                      title,
+                      bidEth: state ? formatEther(state.highestBid) : "0",
+                      endJst: state ? fmtJst(state.endTime) : "",
+                      live: state.live === true,
+                      role:
+                        address &&
+                        state.highestBidder &&
+                        address.toLowerCase() ===
+                          state.highestBidder.toLowerCase() &&
+                        state.highestBid > 0n
+                          ? "highest"
+                          : pendingAmt > 0n
+                            ? "in"
+                            : "watch",
+                    })
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  𝕏 で知らせる
+                </a>
+              </div>
             )}
           </div>
 
