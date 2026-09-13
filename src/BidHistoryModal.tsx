@@ -310,6 +310,21 @@ export function BidHistoryModal({
   const cursorRef = useRef<ScanCursor | null>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
   const loadGen = useRef(0);
+  const [vis, setVis] = useState<"closed" | "opening" | "open" | "closing">("closed");
+
+  useEffect(() => {
+    if (open) {
+      setVis("opening");
+      const id = requestAnimationFrame(() => setVis("open"));
+      return () => cancelAnimationFrame(id);
+    }
+    setVis((cur) => {
+      if (cur === "closed") return "closed";
+      return "closing";
+    });
+    const t = window.setTimeout(() => setVis("closed"), 160);
+    return () => window.clearTimeout(t);
+  }, [open]);
 
   // Reset view when opened
   useEffect(() => {
@@ -439,7 +454,7 @@ export function BidHistoryModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (vis === "closed") return null;
 
   const idx = lots.findIndex((l) => l.id === viewId);
   const hasPrev = idx > 0;
@@ -452,9 +467,19 @@ export function BidHistoryModal({
       : null;
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div
+      className={
+        "modal-backdrop" + (vis === "open" ? " is-open" : "") + (vis === "closing" ? " is-closing" : "")
+      }
+      role="presentation"
+      onClick={onClose}
+    >
       <div
-        className="modal"
+        className={
+          "modal t-modal" +
+          (vis === "open" ? " is-open" : "") +
+          (vis === "closing" ? " is-closing" : "")
+        }
         role="dialog"
         aria-modal="true"
         aria-label="入札履歴"

@@ -11,6 +11,7 @@ import {
 import { formatEther, parseEther, type Address } from "viem";
 import { AdminCreateAuction } from "./AdminCreateAuction";
 import { BidHistoryModal } from "./BidHistoryModal";
+import { DigitPop } from "./DigitPop";
 import {
   AUCTION_ABI,
   AUCTION_ADDRESS,
@@ -245,6 +246,14 @@ export default function App() {
   const [bidHistoryOpen, setBidHistoryOpen] = useState(false);
   const [bidInput, setBidInput] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+  const [bidShake, setBidShake] = useState(false);
+
+  const pulseBidShake = useCallback(() => {
+    setBidShake(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setBidShake(true));
+    });
+  }, []);
 
   useEffect(() => {
     let cancel = false;
@@ -326,9 +335,11 @@ export default function App() {
   const onBid = async () => {
     try {
       setStatus(null);
+      setBidShake(false);
       await ensureChain();
       if (!state?.live) {
         setStatus("現在入札できません（終了または未開始）");
+        pulseBidShake();
         return;
       }
       const value = parseEther(bidInput || "0");
@@ -336,6 +347,7 @@ export default function App() {
         setStatus(
           `今回送る ETH の最低は ${formatEther(minSend)}（預託込みで合計 ${formatEther(minNextBid)}）`
         );
+        pulseBidShake();
         return;
       }
       writeContract({
@@ -350,6 +362,7 @@ export default function App() {
       setStatus("入札を送信中…");
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "入札エラー");
+      pulseBidShake();
     }
   };
 
@@ -580,7 +593,12 @@ export default function App() {
           <div className="stat-block">
             <div className="stat-label">現在の入札額</div>
             <div className="stat-value">
-              Ξ {state ? formatEther(state.highestBid) : "—"}
+              Ξ{" "}
+              {state ? (
+                <DigitPop value={formatEther(state.highestBid)} />
+              ) : (
+                "—"
+              )}
             </div>
             <div className="stat-meta">
               最高入札者 {shortAddr(state?.highestBidder)}
@@ -673,13 +691,21 @@ export default function App() {
                   入札すると預託は新しい入札に使われます（引き出さず戦えます）。
                 </p>
               )}
-              <div className="bid-input-wrap">
+              <div
+                className={
+                  "bid-input-wrap t-input" +
+                  (bidShake ? " is-error is-shaking" : "")
+                }
+              >
                 <span className="eth">Ξ</span>
                 <input
                   type="text"
                   inputMode="decimal"
                   value={bidInput}
-                  onChange={(e) => setBidInput(e.target.value)}
+                  onChange={(e) => {
+                    setBidShake(false);
+                    setBidInput(e.target.value);
+                  }}
                   aria-label="入札額 ETH"
                   placeholder={formatEther(minSend)}
                 />

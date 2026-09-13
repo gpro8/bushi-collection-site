@@ -1014,3 +1014,81 @@ a:hover {
   font-size: 0.72rem;
   color: var(--muted);
 }
+
+.bid-input-wrap.is-error {
+  border-color: var(--danger);
+}
+
+.t-digit-group {
+  display: inline-flex;
+  align-items: baseline;
+}
+.t-digit {
+  display: inline-block;
+  will-change: transform, opacity, filter;
+}
+.t-digit-group.is-animating .t-digit {
+  animation: t-digit-pop-in var(--digit-dur, 500ms) var(--digit-ease, cubic-bezier(0.34, 1.45, 0.64, 1)) both;
+}
+@keyframes t-digit-pop-in {
+  0% {
+    transform: translateY(var(--digit-distance, 8px));
+    opacity: 0;
+    filter: blur(var(--digit-blur, 2px));
+  }
+  100% {
+    transform: translate(0, 0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.t-input.is-shaking {
+  animation: t-input-shake 280ms linear;
+}
+@keyframes t-input-shake {
+  0% { transform: translateX(0); animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+  28.57% { transform: translateX(6px); animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+  57.14% { transform: translateX(-6px); animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+  78.57% { transform: translateX(4px); animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+  100% { transform: translateX(0); }
+}
+
+.modal-backdrop {
+  opacity: 0;
+  transition: opacity 250ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.modal-backdrop.is-open { opacity: 1; }
+.modal-backdrop.is-closing { opacity: 0; transition-duration: 150ms; }
+
+.t-modal {
+  transform-origin: center;
+  transform: scale(0.96);
+  opacity: 0;
+  transition:
+    transform 250ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 250ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
+}
+.t-modal.is-open {
+  transform: scale(1);
+  opacity: 1;
+}
+.t-modal.is-closing {
+  transform: scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-digit-group .t-digit,
+  .t-input {
+    animation: none !important;
+    transform: none !important;
+  }
+  .t-modal,
+  .modal-backdrop {
+    transition: none !important;
+  }
+}
