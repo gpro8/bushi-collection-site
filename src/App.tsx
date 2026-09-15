@@ -368,7 +368,7 @@ export default function App() {
   const ensureChain = useCallback(async () => {
     if (chainId !== CHAIN.id) {
       switchChain?.({ chainId: CHAIN.id });
-      throw new Error("Base Sepolia に切り替えてください");
+      throw new Error(`${NETWORK_LABEL} に切り替えてください`);
     }
   }, [chainId, switchChain]);
 
@@ -824,7 +824,7 @@ export default function App() {
               className="btn warn wide"
               onClick={() => switchChain?.({ chainId: CHAIN.id })}
             >
-              Base Sepolia に切替
+              {NETWORK_LABEL} に切替
             </button>
           )}
 
