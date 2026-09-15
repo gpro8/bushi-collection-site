@@ -62,19 +62,35 @@ function xIntentUrl(text: string): string {
 function buildAuctionShare(opts: {
   title: string;
   bidEth: string;
+  startJst: string;
   endJst: string;
-  live: boolean;
+  phase: "scheduled" | "live" | "ended";
   role: "highest" | "in" | "watch";
 }): string {
   const url = collectionSiteUrl();
+  if (opts.phase === "scheduled") {
+    const lines = ["武士コレ まもなく開催", opts.title];
+    if (opts.startJst) lines.push(`開始 ${opts.startJst}`);
+    if (opts.endJst) lines.push(`終了 ${opts.endJst}`);
+    lines.push(url);
+    return lines.join("\n");
+  }
+  if (opts.phase === "ended") {
+    const lines = ["武士コレ この回は終了", opts.title];
+    if (opts.bidEth && opts.bidEth !== "0") {
+      lines.push(`落札 Ξ ${opts.bidEth}`);
+    }
+    if (opts.endJst) lines.push(`終了 ${opts.endJst}`);
+    lines.push("次の出品はサイトで");
+    lines.push(url);
+    return lines.join("\n");
+  }
   const head =
     opts.role === "highest"
       ? "武士コレで最高入札しています"
       : opts.role === "in"
         ? "武士コレの入札に参加しています"
-        : opts.live
-          ? "武士コレ 開催中"
-          : "武士コレ";
+        : "武士コレ 開催中";
   const lines = [head, opts.title];
   if (opts.bidEth && opts.bidEth !== "0") {
     lines.push(`現在 Ξ ${opts.bidEth}`);
@@ -661,8 +677,13 @@ export default function App() {
                     buildAuctionShare({
                       title,
                       bidEth: state ? formatEther(state.highestBid) : "0",
+                      startJst: state ? fmtJst(state.startTime) : "",
                       endJst: state ? fmtJst(state.endTime) : "",
-                      live: state.live === true,
+                      phase: isScheduled
+                        ? "scheduled"
+                        : state.live === true
+                          ? "live"
+                          : "ended",
                       role:
                         address &&
                         state.highestBidder &&
