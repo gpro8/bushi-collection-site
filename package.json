@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:sepolia": "VITE_NETWORK=sepolia vite",
     "build": "tsc --noEmit && vite build",
+    "build:sepolia": "VITE_NETWORK=sepolia tsc --noEmit && VITE_NETWORK=sepolia vite build",
     "preview": "vite preview"
   },
   "dependencies": {

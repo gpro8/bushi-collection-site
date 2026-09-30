@@ -2,12 +2,21 @@
 
 CN Nouns–inspired UI for **Bushi Collection** English auctions on Base.
 
-## Sepolia addresses
+## Sepolia addresses (dogfood · v4)
 
 | Contract | Address |
 |----------|---------|
 | Collection | `0x4BE9e05b953849f13C0e27A257A8D89b4D221318` |
-| Auction | `0xCbf8d57F2fc99566b859a2243045E70092054e17` |
+| Auction v4 | `0x2e21fbc98129886AA6F3AEF39ECbd513BDFEc12A` |
+
+LIVE Pages = **Base mainnet**. Do not paste lot-1 `tokenURI` there.
+
+```bash
+cd /Users/gpro/bushi-collection-site
+npm run dev:sepolia
+```
+
+Wallet: **Base Sepolia**. Owner EOA `0x93f9…cBd0`. Header reads `Base Sepolia · English Auction`.
 
 ## Dev
 
