@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createPublicClient,
+  fallback,
   formatEther,
   http,
   parseAbiItem,
@@ -8,7 +9,7 @@ import {
   type Hex,
   type Log,
 } from "viem";
-import { AUCTION_ADDRESS, AUCTION_DEPLOY_BLOCK, CHAIN, RPC_URL, arweaveToHttp } from "./config";
+import { AUCTION_ADDRESS, AUCTION_DEPLOY_BLOCK, CHAIN, RPC_URLS, arweaveToHttp } from "./config";
 
 export type BidRow = {
   bidder: Address;
@@ -27,11 +28,11 @@ export type LotInfo = {
 /** Preferred window; shrinks if RPC rejects (Alchemy free = 10 blocks). */
 const LOG_CHUNK_DEFAULT = 1999n;
 let logSpan = LOG_CHUNK_DEFAULT;
-const CHUNK_DELAY_MS = 100;
-/** First open: keep scanning until this many newest bids (not a time window). */
+const CHUNK_DELAY_MS = 50;
+/** Newest bids to collect per page. */
 const INITIAL_BID_TARGET = 5;
-/** Safety: max 2000-block windows per scan call (~400k blocks). */
-const MAX_CHUNKS_PER_SCAN = 250;
+/** ~12k blocks/page (~6h on Base). Do not walk to deploy floor on first open. */
+const MAX_CHUNKS_PER_SCAN = 6;
 
 const bidEvent = parseAbiItem(
   "event BidPlaced(uint256 indexed auctionId, address indexed bidder, uint256 amount, uint256 endTime)"
@@ -42,7 +43,9 @@ const createdEvent = parseAbiItem(
 
 const client = createPublicClient({
   chain: CHAIN,
-  transport: http(RPC_URL, { retryCount: 2, retryDelay: 500 }),
+  transport: fallback(
+    RPC_URLS.map((u) => http(u, { timeout: 12_000, retryCount: 1, retryDelay: 400 }))
+  ),
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -582,12 +585,21 @@ export function BidHistoryModal({
 
         {loading && bids.length === 0 && (
           <p className="modal-empty">
-            履歴を読み込み中…（最新の入札を検索しています）
+            履歴を読み込み中…
           </p>
         )}
         {err && <p className="modal-empty err">{err}</p>}
         {!loading && !err && bids.length === 0 && (
-          <p className="modal-empty">まだ入札がありません</p>
+          <>
+            <p className="modal-empty">まだ入札はありません</p>
+            {!done && (
+              <p className="modal-empty">
+                <button type="button" className="linkish" onClick={loadOlder}>
+                  古い履歴を読み込む
+                </button>
+              </p>
+            )}
+          </>
         )}
 
         {bids.length > 0 && (
