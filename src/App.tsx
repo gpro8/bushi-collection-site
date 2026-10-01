@@ -53,6 +53,16 @@ function collectionSiteUrl() {
   return `${window.location.origin}${base}`;
 }
 
+/** 開始まで / 終了まで: normal → last 24h 藍 → 6h 紅 → 1h bold → 5min large pulse */
+function countdownClass(active: boolean, left: number): string {
+  if (!active || left <= 0) return "stat-value countdown";
+  if (left <= 300) return "stat-value countdown countdown-heat countdown-heat-go";
+  if (left <= 3600) return "stat-value countdown countdown-heat countdown-heat-hot";
+  if (left <= 6 * 3600) return "stat-value countdown countdown-heat countdown-heat-warn";
+  if (left <= 24 * 3600) return "stat-value countdown countdown-heat countdown-heat-soon";
+  return "stat-value countdown";
+}
+
 function xIntentUrl(text: string): string {
   const u = new URL("https://twitter.com/intent/tweet");
   u.searchParams.set("text", text);
@@ -718,13 +728,10 @@ export default function App() {
                       : "カウントダウン"}
             </div>
             <div
-              className={
-                countdownLeft > 0 && (isScheduled || !!state?.live)
-                  ? countdownLeft <= 300
-                    ? "stat-value countdown countdown-wait countdown-wait-5m"
-                    : "stat-value countdown countdown-wait"
-                  : "stat-value countdown"
-              }
+              className={countdownClass(
+                countdownLeft > 0 && (isScheduled || !!state?.live),
+                countdownLeft
+              )}
             >
               {state?.settled
                 ? "Settled"

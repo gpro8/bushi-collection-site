@@ -15,9 +15,8 @@ export const NETWORK_LABEL = d.label;
 export const COLLECTION_ABI = collectionAbi as readonly unknown[];
 export const AUCTION_ABI = auctionAbi as readonly unknown[];
 
-/** Public RPC — override with VITE_RPC_URL (Alchemy recommended on mainnet) */
-export const RPC_URL =
-  (import.meta.env.VITE_RPC_URL as string | undefined) || d.rpcFallback;
+/** Browser RPC = public chain node (per-visitor IP). Never bake Alchemy — VITE_RPC_URL ships in the JS. */
+export const RPC_URL = d.rpcFallback;
 
 export const EXPLORER = d.explorer;
 

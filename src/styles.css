@@ -628,16 +628,38 @@ a:hover {
   font-size: 1.55rem;
 }
 
-/* 開始まで / 終了まで: blue → last 5 min red + larger */
-.stat-value.countdown.countdown-wait {
-  color: var(--accent-2);
-  font-weight: 700;
+/* Heat: >24h normal (inherit). Last day 藍 → 6h 紅 → 1h bold → 5min large pulse */
+.stat-value.countdown.countdown-heat {
   transition: color 0.35s ease, font-size 0.35s ease;
 }
-.stat-value.countdown.countdown-wait-5m {
+.stat-value.countdown.countdown-heat-soon {
+  color: var(--accent-2);
+  font-weight: 700;
+}
+.stat-value.countdown.countdown-heat-warn {
+  color: var(--danger);
+  font-weight: 700;
+}
+.stat-value.countdown.countdown-heat-hot {
   color: var(--danger);
   font-weight: 800;
-  font-size: 2.55rem; /* ~1.65× */
+  font-size: 1.9rem;
+}
+.stat-value.countdown.countdown-heat-go {
+  color: var(--danger);
+  font-weight: 800;
+  font-size: 2.55rem;
+  transform-origin: left center;
+  animation: countdown-pulse 1.15s ease-in-out infinite;
+}
+@keyframes countdown-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 .stat-meta {
@@ -1113,7 +1135,10 @@ a:hover {
   .modal-backdrop {
     transition: none !important;
   }
-  .stat-value.countdown.countdown-wait {
+  .stat-value.countdown.countdown-heat {
     transition: none;
+  }
+  .stat-value.countdown.countdown-heat-go {
+    animation: none;
   }
 }
