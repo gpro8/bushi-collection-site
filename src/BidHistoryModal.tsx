@@ -24,7 +24,9 @@ export type LotInfo = {
   tokenURI: string;
 };
 
-const LOG_CHUNK = 1999n;
+/** Preferred window; shrinks if RPC rejects (Alchemy free = 10 blocks). */
+const LOG_CHUNK_DEFAULT = 1999n;
+let logSpan = LOG_CHUNK_DEFAULT;
 const CHUNK_DELAY_MS = 100;
 /** First open: keep scanning until this many newest bids (not a time window). */
 const INITIAL_BID_TARGET = 5;
@@ -83,13 +85,50 @@ function ipfsToHttp(uri: string): string {
   return arweaveToHttp(uri);
 }
 
+function parseRpcLogSpan(msg: string): bigint | null {
+  const pair = msg.match(/\[(0x[0-9a-f]+),\s*(0x[0-9a-f]+)\]/i);
+  if (pair) {
+    try {
+      const a = BigInt(pair[1]);
+      const b = BigInt(pair[2]);
+      if (b >= a) return b - a;
+    } catch {
+      /* ignore */
+    }
+  }
+  const n = msg.match(/up to a (\d+) block range/i);
+  if (n) {
+    const w = BigInt(n[1]);
+    return w > 0n ? w - 1n : 0n;
+  }
+  return null;
+}
+
 async function getLogsOnce(params: {
   event: typeof bidEvent | typeof createdEvent;
   args?: { auctionId?: bigint };
   fromBlock: bigint;
   toBlock: bigint;
 }): Promise<Log[]> {
-  const { event, args, fromBlock, toBlock } = params;
+  const { event, args } = params;
+  const fromBlock = params.fromBlock;
+  const toBlock = params.toBlock;
+  if (toBlock < fromBlock) return [];
+
+  if (toBlock - fromBlock > logSpan) {
+    const all: Log[] = [];
+    let f = fromBlock;
+    while (f <= toBlock) {
+      const t = f + logSpan > toBlock ? toBlock : f + logSpan;
+      all.push(
+        ...(await getLogsOnce({ event, args, fromBlock: f, toBlock: t }))
+      );
+      f = t + 1n;
+      await sleep(CHUNK_DELAY_MS);
+    }
+    return all;
+  }
+
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       return (await client.getLogs({
@@ -101,7 +140,12 @@ async function getLogsOnce(params: {
       })) as Log[];
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (/rate limit|429|timeout|limit/i.test(msg) && attempt < 4) {
+      const parsed = parseRpcLogSpan(msg);
+      if (parsed != null && parsed < logSpan) {
+        logSpan = parsed < 1n ? 1n : parsed;
+        return getLogsOnce({ event, args, fromBlock, toBlock });
+      }
+      if (/rate limit|429|timeout/i.test(msg) && attempt < 4) {
         await sleep(600 * (attempt + 1));
         continue;
       }
@@ -192,7 +236,7 @@ async function scanBidsPage(
     chunks < maxChunks &&
     found.length < minBids
   ) {
-    const from = to > cursor.floor + LOG_CHUNK ? to - LOG_CHUNK : cursor.floor;
+    const from = to > cursor.floor + logSpan ? to - logSpan : cursor.floor;
     const logs = await getLogsOnce({
       event: bidEvent,
       args: { auctionId },
@@ -234,7 +278,7 @@ async function fetchLotsOnce(): Promise<LotInfo[]> {
   let empty = 0;
   // Enough windows for lot list; stop after gap once we have some
   while (to >= floor && empty < 10) {
-    const from = to > floor + LOG_CHUNK ? to - LOG_CHUNK : floor;
+    const from = to > floor + logSpan ? to - logSpan : floor;
     const logs = await getLogsOnce({
       event: createdEvent,
       fromBlock: from,
