@@ -719,7 +719,7 @@ export default function App() {
             </div>
             <div
               className={
-                isScheduled && countdownLeft > 0
+                countdownLeft > 0 && (isScheduled || !!state?.live)
                   ? countdownLeft <= 300
                     ? "stat-value countdown countdown-wait countdown-wait-5m"
                     : "stat-value countdown countdown-wait"

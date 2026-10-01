@@ -628,7 +628,7 @@ a:hover {
   font-size: 1.55rem;
 }
 
-/* 開始まで: blue wait → last 5 min red + larger. 終了まで stays default. */
+/* 開始まで / 終了まで: blue → last 5 min red + larger */
 .stat-value.countdown.countdown-wait {
   color: var(--accent-2);
   font-weight: 700;
