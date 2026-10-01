@@ -717,7 +717,15 @@ export default function App() {
                       ? "ステータス"
                       : "カウントダウン"}
             </div>
-            <div className="stat-value countdown">
+            <div
+              className={
+                isScheduled && countdownLeft > 0
+                  ? countdownLeft <= 300
+                    ? "stat-value countdown countdown-wait countdown-wait-5m"
+                    : "stat-value countdown countdown-wait"
+                  : "stat-value countdown"
+              }
+            >
               {state?.settled
                 ? "Settled"
                 : isEnded

@@ -628,6 +628,18 @@ a:hover {
   font-size: 1.55rem;
 }
 
+/* 開始まで: blue wait → last 5 min red + larger. 終了まで stays default. */
+.stat-value.countdown.countdown-wait {
+  color: var(--accent-2);
+  font-weight: 700;
+  transition: color 0.35s ease, font-size 0.35s ease;
+}
+.stat-value.countdown.countdown-wait-5m {
+  color: var(--danger);
+  font-weight: 800;
+  font-size: 2.55rem; /* ~1.65× */
+}
+
 .stat-meta {
   margin-top: 0.3rem;
   font-size: 0.82rem;
@@ -1100,5 +1112,8 @@ a:hover {
   .t-modal,
   .modal-backdrop {
     transition: none !important;
+  }
+  .stat-value.countdown.countdown-wait {
+    transition: none;
   }
 }
