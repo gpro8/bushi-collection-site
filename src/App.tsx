@@ -914,6 +914,7 @@ export default function App() {
         currentTokenURI={state?.tokenURI}
         currentTitle={meta.name || title}
         currentImage={artUrl || undefined}
+        startTime={state?.startTime}
         open={bidHistoryOpen}
         onClose={() => setBidHistoryOpen(false)}
       />
