@@ -934,7 +934,7 @@ export default function App() {
           >
             武鑑
           </a>
-          （BushiDAO の名刺）に掲げられます。
+          （BushiDAO の名鑑）に掲げられます。
         </p>
         <details>
           <summary>まとめ</summary>
