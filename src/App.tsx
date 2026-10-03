@@ -53,6 +53,13 @@ function collectionSiteUrl() {
   return `${window.location.origin}${base}`;
 }
 
+/** X share only. Root URL is cached as no-card; in-app stays clean. Bump `v` on next OG swap. */
+function collectionShareUrl() {
+  const u = new URL(collectionSiteUrl());
+  u.searchParams.set("v", "og");
+  return u.toString();
+}
+
 /** 開始まで / 終了まで: normal → last 24h 藍 → 6h 紅 → 1h bold → 5min large pulse */
 function countdownClass(active: boolean, left: number): string {
   if (!active || left <= 0) return "stat-value countdown";
@@ -77,7 +84,7 @@ function buildAuctionShare(opts: {
   phase: "scheduled" | "live" | "ended";
   role: "highest" | "in" | "watch";
 }): string {
-  const url = collectionSiteUrl();
+  const url = collectionShareUrl();
   if (opts.phase === "scheduled") {
     const lines = ["武士コレ まもなく開催", opts.title];
     if (opts.startJst) lines.push(`開始 ${opts.startJst}`);
