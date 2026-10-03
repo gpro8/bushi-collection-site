@@ -19,8 +19,8 @@ export const AUCTION_ABI = auctionAbi as readonly unknown[];
 export const RPC_URL = d.rpcFallback;
 export const RPC_URLS: string[] =
   d.id === "mainnet"
-    ? ["https://mainnet.base.org", "https://base-rpc.publicnode.com"]
-    : ["https://sepolia.base.org", "https://base-sepolia-rpc.publicnode.com"];
+    ? ["https://mainnet.base.org"]
+    : ["https://sepolia.base.org"];
 
 export const EXPLORER = d.explorer;
 

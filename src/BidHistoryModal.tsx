@@ -25,8 +25,8 @@ export type LotInfo = {
   tokenURI: string;
 };
 
-/** Preferred window; shrinks if RPC rejects (publicnode max 10k). */
-const LOG_CHUNK_DEFAULT = 8999n;
+/** Preferred window; shrinks if RPC rejects. publicnode archive ≠ 10k. */
+const LOG_CHUNK_DEFAULT = 1999n;
 let logSpan = LOG_CHUNK_DEFAULT;
 const CHUNK_DELAY_MS = 50;
 /** Newest bids to collect per page. */
@@ -104,7 +104,26 @@ function parseRpcLogSpan(msg: string): bigint | null {
     const w = BigInt(n[1]);
     return w > 0n ? w - 1n : 0n;
   }
+  if (/archive|personal token|allnodes|invalid parameters/i.test(msg)) {
+    if (logSpan > 1999n) return 1999n;
+    if (logSpan > 499n) return 499n;
+    if (logSpan > 99n) return 99n;
+  }
   return null;
+}
+
+function friendlyLogsError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/archive|personal token|allnodes/i.test(msg)) {
+    return "履歴の取得に失敗しました。少し待って再度開いてください";
+  }
+  if (/rate limit|429/i.test(msg)) {
+    return "混み合っています。少し待って再度開いてください";
+  }
+  if (/timeout/i.test(msg)) {
+    return "応答が遅いです。少し待って再度開いてください";
+  }
+  return "履歴の取得に失敗しました";
 }
 
 async function getLogsOnce(params: {
@@ -465,7 +484,7 @@ export function BidHistoryModal({
           });
       } catch (e) {
         if (gen !== loadGen.current) return;
-        setErr(e instanceof Error ? e.message : "履歴の取得に失敗しました");
+        setErr(friendlyLogsError(e));
         setLoading(false);
       }
     },
@@ -517,7 +536,7 @@ export function BidHistoryModal({
       setDone(pageDone || Boolean(cursor && cursor.nextTo < cursor.floor));
     } catch (e) {
       if (gen !== loadGen.current) return;
-      setErr(e instanceof Error ? e.message : "追加読み込みに失敗");
+      setErr(friendlyLogsError(e));
     } finally {
       if (gen === loadGen.current) setLoadingMore(false);
     }
