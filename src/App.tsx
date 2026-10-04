@@ -925,6 +925,7 @@ export default function App() {
           <strong>Bushi Collection</strong> は Base 上の English
           オークションです。1点ずつ出品され、最高入札者が settle 後に NFT
           を受け取ります。売上はクリエイターへ 100%（ロット作成時に固定）。
+          第1回は終了。次の出品はサイトで。
         </p>
         <p>
           落札したキャラクターは{" "}
