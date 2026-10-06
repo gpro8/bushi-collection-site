@@ -25,8 +25,8 @@ export type LotInfo = {
   tokenURI: string;
 };
 
-/** Preferred window; shrinks if RPC rejects. publicnode archive ≠ 10k. */
-const LOG_CHUNK_DEFAULT = 1999n;
+/** Preferred window. mainnet.base.org rejects above 500 (“limited to a 500 range”). */
+const LOG_CHUNK_DEFAULT = 499n;
 let logSpan = LOG_CHUNK_DEFAULT;
 const CHUNK_DELAY_MS = 50;
 /** Newest bids to collect per page. */
@@ -99,7 +99,7 @@ function parseRpcLogSpan(msg: string): bigint | null {
       /* ignore */
     }
   }
-  const n = msg.match(/up to a (\d+) block range/i);
+  const n = msg.match(/(?:up to a |limited to a )(\d+)(?: block)? range/i);
   if (n) {
     const w = BigInt(n[1]);
     return w > 0n ? w - 1n : 0n;
@@ -230,6 +230,17 @@ type ScanCursor = {
   nextTo: bigint; // next window ends here (inclusive); 0n = done
   floor: bigint;
 };
+
+function lotCeiling(latest: bigint, endTime?: bigint): bigint {
+  if (endTime == null || endTime === 0n) return latest;
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  if (endTime >= now) return latest;
+  const after = now - endTime;
+  const blocks = after / 2n;
+  const est = latest > blocks ? latest - blocks : latest;
+  const padded = est + 3600n;
+  return padded < latest ? padded : latest;
+}
 
 function lotFloor(latest: bigint, startTime?: bigint): bigint {
   const deploy = AUCTION_DEPLOY_BLOCK;
@@ -371,6 +382,7 @@ type Props = {
   currentTitle?: string;
   currentImage?: string;
   startTime?: bigint;
+  endTime?: bigint;
   open: boolean;
   onClose: () => void;
 };
@@ -381,6 +393,7 @@ export function BidHistoryModal({
   currentTitle,
   currentImage,
   startTime,
+  endTime,
   open,
   onClose,
 }: Props) {
@@ -436,12 +449,13 @@ export function BidHistoryModal({
         const latest = await client.getBlockNumber();
         if (gen !== loadGen.current) return;
         const floor = lotFloor(latest, startTime);
-        let cursor = freshCursor(latest, floor);
+        const ceiling = lotCeiling(latest, endTime);
+        let cursor = freshCursor(ceiling, floor);
         const page = await scanBidsPage(
           id,
           cursor,
           INITIAL_BID_TARGET,
-          chunksForRange(floor, latest)
+          chunksForRange(floor, ceiling)
         );
         if (gen !== loadGen.current) return;
         cursorRef.current = page.cursor;
@@ -488,7 +502,7 @@ export function BidHistoryModal({
         setLoading(false);
       }
     },
-    [currentAuctionId, currentTokenURI, currentTitle, currentImage, startTime]
+    [currentAuctionId, currentTokenURI, currentTitle, currentImage, startTime, endTime]
   );
 
   // Every open + every lot change → full fresh reload (no sticky cache)

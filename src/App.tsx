@@ -915,6 +915,7 @@ export default function App() {
         currentTitle={meta.name || title}
         currentImage={artUrl || undefined}
         startTime={state?.startTime}
+        endTime={state?.endTime}
         open={bidHistoryOpen}
         onClose={() => setBidHistoryOpen(false)}
       />
