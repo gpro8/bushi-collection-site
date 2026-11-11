@@ -17,9 +17,20 @@ export const AUCTION_ABI = auctionAbi as readonly unknown[];
 
 /** Browser RPC = public chain node (per-visitor IP). Never bake Alchemy. */
 export const RPC_URL = d.rpcFallback;
+/**
+ * Keyless pool, device → node. Order is fail-over, not a race.
+ * drpc and thirdweb answered eth_getLogs on a recent window and on the
+ * deploy block. Official is last: 5 req/s, body `request limit reached`.
+ * Not publicnode — old getLogs asks for an Allnodes token.
+ * Not Alchemy. Do not read VITE_RPC_URL.
+ */
 export const RPC_URLS: string[] =
   d.id === "mainnet"
-    ? ["https://mainnet.base.org"]
+    ? [
+        "https://base.drpc.org",
+        "https://base.rpc.thirdweb.com",
+        "https://mainnet.base.org",
+      ]
     : ["https://sepolia.base.org"];
 
 export const EXPLORER = d.explorer;

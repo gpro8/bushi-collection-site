@@ -45,7 +45,8 @@ const createdEvent = parseAbiItem(
 const client = createPublicClient({
   chain: CHAIN,
   transport: fallback(
-    RPC_URLS.map((u) => http(u, { timeout: 12_000, retryCount: 0 }))
+    RPC_URLS.map((u) => http(u, { timeout: 12_000, retryCount: 0 })),
+    { rank: false, retryCount: 0 }
   ),
 });
 
