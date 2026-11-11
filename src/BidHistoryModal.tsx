@@ -28,7 +28,8 @@ export type LotInfo = {
 /** Preferred window. mainnet.base.org rejects above 500 (“limited to a 500 range”). */
 const LOG_CHUNK_DEFAULT = 499n;
 let logSpan = LOG_CHUNK_DEFAULT;
-const CHUNK_DELAY_MS = 50;
+/** Stay under mainnet.base.org (5 req / 1s). 50ms bursts trip “request limit reached”. */
+const CHUNK_DELAY_MS = 350;
 /** Newest bids to collect per page. */
 const INITIAL_BID_TARGET = 5;
 /** Hard cap per scan so a stuck RPC cannot loop forever. */
@@ -44,7 +45,7 @@ const createdEvent = parseAbiItem(
 const client = createPublicClient({
   chain: CHAIN,
   transport: fallback(
-    RPC_URLS.map((u) => http(u, { timeout: 12_000, retryCount: 1, retryDelay: 400 }))
+    RPC_URLS.map((u) => http(u, { timeout: 12_000, retryCount: 0 }))
   ),
 });
 
@@ -112,12 +113,32 @@ function parseRpcLogSpan(msg: string): bigint | null {
   return null;
 }
 
+function errorBlob(e: unknown): string {
+  if (!e || typeof e !== "object") return String(e);
+  const o = e as {
+    message?: string;
+    details?: string;
+    shortMessage?: string;
+    cause?: unknown;
+  };
+  return [o.shortMessage, o.details, o.message, errorBlob(o.cause)]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** mainnet.base.org returns this as an RPC error, not HTTP 429 in the message. */
+function isRateLimited(e: unknown): boolean {
+  return /request limit reached|rate limit|too many requests|-32011|\b429\b/i.test(
+    errorBlob(e)
+  );
+}
+
 function friendlyLogsError(e: unknown): string {
-  const msg = e instanceof Error ? e.message : String(e);
+  const msg = errorBlob(e);
   if (/archive|personal token|allnodes/i.test(msg)) {
     return "履歴の取得に失敗しました。少し待って再度開いてください";
   }
-  if (/rate limit|429/i.test(msg)) {
+  if (isRateLimited(e)) {
     return "混み合っています。少し待って再度開いてください";
   }
   if (/timeout/i.test(msg)) {
@@ -161,14 +182,14 @@ async function getLogsOnce(params: {
         toBlock,
       })) as Log[];
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorBlob(e);
       const parsed = parseRpcLogSpan(msg);
       if (parsed != null && parsed < logSpan) {
         logSpan = parsed < 1n ? 1n : parsed;
         return getLogsOnce({ event, args, fromBlock, toBlock });
       }
-      if (/rate limit|429|timeout/i.test(msg) && attempt < 4) {
-        await sleep(600 * (attempt + 1));
+      if ((isRateLimited(e) || /timeout/i.test(msg)) && attempt < 4) {
+        await sleep(1200 * (attempt + 1));
         continue;
       }
       throw e;
@@ -198,7 +219,7 @@ async function attachTimestamps(rows: BidRow[]): Promise<BidRow[]> {
     try {
       const b = await client.getBlock({ blockNumber: BigInt(bn) });
       tsMap.set(bn, Number(b.timestamp));
-      await sleep(30);
+      await sleep(250);
     } catch {
       /* ignore */
     }
