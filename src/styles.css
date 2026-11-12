@@ -333,6 +333,37 @@ a:hover {
   padding: 1.35rem 1.4rem 1.5rem;
 }
 
+.stage-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0 0 0.35rem;
+}
+
+.stage-switch .eyebrow {
+  margin: 0;
+  flex: 1;
+}
+
+.stage-note {
+  margin: 0 0 0.75rem;
+  color: var(--muted, #9a917f);
+  font-size: 0.85rem;
+}
+
+.modal-stage-hit {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
 .eyebrow {
   margin: 0 0 0.35rem;
   font-size: 0.8rem;

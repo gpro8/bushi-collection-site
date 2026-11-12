@@ -101,5 +101,56 @@
       "txHash": "0x7bf3257efa1b6f2cb1a4d1e04b752cecc82ad20798bbc352fba81104aafb595d",
       "timestamp": 1790856019
     }
-  ]
+  ],
+  "description": "カクシン（カクシ-Nｴﾇ）。知るものぞ知る、武士コレ初期の隠しキャラ。〚隠し-信長〛\n\nThe first lot’s hidden character — for those who know.\n\n「不義を致す者を ONi と呼び、容赦なく切り捨てる。義を誓うものには助太刀の心を忘れない。」",
+  "attributes": [
+    {
+      "trait_type": "Collection",
+      "value": "Bushi Collection"
+    },
+    {
+      "display_type": "number",
+      "trait_type": "Lot",
+      "value": 1,
+      "max_value": 12
+    },
+    {
+      "trait_type": "Creator",
+      "value": "NIKO24"
+    },
+    {
+      "trait_type": "Medium",
+      "value": "手描き"
+    },
+    {
+      "trait_type": "Homage",
+      "value": "織田信長"
+    },
+    {
+      "trait_type": "Attire",
+      "value": "鎧"
+    },
+    {
+      "trait_type": "Weapon",
+      "value": "鉄砲"
+    },
+    {
+      "trait_type": "Range",
+      "value": "遠"
+    },
+    {
+      "trait_type": "Role",
+      "value": "先手"
+    },
+    {
+      "trait_type": "Namer",
+      "value": "@BLUEpanda_japan"
+    },
+    {
+      "trait_type": "License",
+      "value": "CC0"
+    }
+  ],
+  "endedAt": 1791115200,
+  "finalAmount": "120000000000000000"
 }

@@ -23,6 +23,7 @@ import {
   arweaveToHttp,
 } from "./config";
 import { fmtCountdown, fmtJst } from "./timeJst";
+import { SAVED_LOTS, fetchSavedLot, type SavedLot } from "./savedLots";
 import { initTheme, toggleTheme, type ThemeMode } from "./theme";
 
 type AuctionState = {
@@ -317,6 +318,7 @@ export default function App() {
   const [descOpen, setDescOpen] = useState(false);
   const [artBroken, setArtBroken] = useState(false);
   const [bidHistoryOpen, setBidHistoryOpen] = useState(false);
+  const [stageLot, setStageLot] = useState<SavedLot | null>(null);
   const [bidInput, setBidInput] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [bidShake, setBidShake] = useState(false);
@@ -406,6 +408,7 @@ export default function App() {
   }, [chainId, switchChain]);
 
   const onBid = async () => {
+    if (stageLot) return;
     try {
       setStatus(null);
       setBidShake(false);
@@ -480,21 +483,57 @@ export default function App() {
     (a) => a && (a.trait_type || a.value !== undefined)
   );
   const desc = (meta.description || "").trim();
+  const viewingPast = stageLot != null;
+  const shownTitle = viewingPast && stageLot.name ? stageLot.name : title;
+  const shownArt = viewingPast && stageLot.image ? stageLot.image : artUrl;
+  const shownAttrs = viewingPast ? stageLot.attributes || [] : attrs;
+  const shownDesc = viewingPast ? (stageLot.description || "").trim() : desc;
   const { preview: descPreview, hasMore: descHasMore } = useMemo(
-    () => splitDescription(desc),
-    [desc]
+    () => splitDescription(shownDesc),
+    [shownDesc]
   );
-  const descShown = descOpen ? desc : descPreview;
-  const canSettle = isEnded;
-  const showBid = state?.live === true;
+  const descShown = descOpen ? shownDesc : descPreview;
+  const canSettle = isEnded && !viewingPast;
+  const showBid = state?.live === true && !viewingPast;
+  const liveId = state?.id ?? 0n;
+  const stageOrder = useMemo(() => {
+    const ids = SAVED_LOTS.map((s) => s.id);
+    if (liveId > 0n && !ids.some((id) => id === liveId)) ids.push(liveId);
+    return ids.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  }, [liveId]);
+  const viewedId = stageLot ? BigInt(stageLot.id) : liveId;
+  const viewedIdx = stageOrder.findIndex((id) => id === viewedId);
+  const prevStageId = viewedIdx > 0 ? stageOrder[viewedIdx - 1] : null;
+  const nextStageId =
+    viewedIdx >= 0 && viewedIdx < stageOrder.length - 1
+      ? stageOrder[viewedIdx + 1]
+      : null;
+  const showStageId = useCallback(
+    async (id: bigint) => {
+      if (id === liveId) {
+        setStageLot(null);
+        setBidHistoryOpen(false);
+        return;
+      }
+      try {
+        const lot = await fetchSavedLot(id);
+        setStageLot(lot);
+        setDescOpen(false);
+        setBidHistoryOpen(false);
+      } catch {
+        setStatus("記録の読み込みに失敗しました");
+      }
+    },
+    [liveId]
+  );
   const pendingAmt = (pending as bigint | undefined) ?? 0n;
   // New lot only when none active (never started or already settled)
   const canCreateAuction =
     !state || state.startTime === 0n || state.settled === true;
 
-  const TraitsGrid = attrs.length > 0 && (
+  const TraitsGrid = shownAttrs.length > 0 && (
     <div className="traits" aria-label="プロパティ">
-      {attrs.map((a, i) => (
+      {shownAttrs.map((a, i) => (
         <div className="trait" key={`${a.trait_type}-${i}`}>
           <span className="trait-type">{a.trait_type || "Trait"}</span>
           <span className="trait-value">{String(a.value ?? "—")}</span>
@@ -586,12 +625,14 @@ export default function App() {
 
       <main className="hero">
         <section className="art-panel">
-          {artUrl && !artBroken ? (
+          {shownArt && !artBroken ? (
             <img
-              src={artUrl}
-              alt={title}
+              src={shownArt}
+              alt={shownTitle}
               className="art"
-              onError={() => setArtBroken(true)}
+              onError={() => {
+                if (!viewingPast) setArtBroken(true);
+              }}
             />
           ) : (
             <div className="art placeholder">
@@ -619,36 +660,76 @@ export default function App() {
         )}
 
         <section className="side">
-          <p className="eyebrow">
-            {state?.live
-              ? "ライブオークション"
-              : state?.settled
+          <div className="stage-switch">
+            <button
+              type="button"
+              className="modal-nav"
+              disabled={prevStageId == null}
+              onClick={() => prevStageId != null && showStageId(prevStageId)}
+              aria-label="前のロット"
+            >
+              ‹
+            </button>
+            <p className="eyebrow">
+              {viewingPast
                 ? "落札済み"
-                : isScheduled
-                  ? "開始予定"
-                  : isEnded
-                    ? "終了 — settle 待ち"
-                    : state && state.startTime > 0n
-                      ? "終了 — settle 待ち"
-                      : "準備中"}
+                : state?.live
+                  ? "ライブオークション"
+                  : state?.settled
+                    ? "落札済み"
+                    : isScheduled
+                      ? "開始予定"
+                      : isEnded
+                        ? "終了 — settle 待ち"
+                        : state && state.startTime > 0n
+                          ? "終了 — settle 待ち"
+                          : "準備中"}
+            </p>
+            <button
+              type="button"
+              className="modal-nav"
+              disabled={nextStageId == null}
+              onClick={() => nextStageId != null && showStageId(nextStageId)}
+              aria-label="次のロット"
+            >
+              ›
+            </button>
+          </div>
+          <p className="lot-label">
+            {viewingPast
+              ? `Bushi Collection · #${stageLot.id}`
+              : lotLabel}
           </p>
-          {lotLabel && <p className="lot-label">{lotLabel}</p>}
-          <h1>{title}</h1>
-
-          {state && state.startTime > 0n && (
-            <div className="time-jst-block">
-              <div>
-                <span className="time-jst-label">開始</span>{" "}
-                <strong>{fmtJst(state.startTime)}</strong>
-              </div>
-              <div>
-                <span className="time-jst-label">終了</span>{" "}
-                <strong>{fmtJst(state.endTime)}</strong>
-              </div>
-            </div>
+          <h1>{shownTitle}</h1>
+          {viewingPast && (
+            <p className="stage-note">この表示はこの端末だけです · 入札は › で現在のロットへ</p>
           )}
 
-          {desc && (
+          {viewingPast ? (
+            <div className="time-jst-block">
+              <div>
+                <span className="time-jst-label">終了</span>{" "}
+                <strong>
+                  {stageLot.endedAt ? fmtJst(stageLot.endedAt) : "—"}
+                </strong>
+              </div>
+            </div>
+          ) : (
+            state && state.startTime > 0n && (
+              <div className="time-jst-block">
+                <div>
+                  <span className="time-jst-label">開始</span>{" "}
+                  <strong>{fmtJst(state.startTime)}</strong>
+                </div>
+                <div>
+                  <span className="time-jst-label">終了</span>{" "}
+                  <strong>{fmtJst(state.endTime)}</strong>
+                </div>
+              </div>
+            )
+          )}
+
+          {shownDesc && (
             <div className="meta-desc">
               <p className="meta-desc-text">{descShown}</p>
               {descHasMore && (
@@ -664,19 +745,29 @@ export default function App() {
           )}
 
           <div className="stat-block">
-            <div className="stat-label">現在の入札額</div>
+            <div className="stat-label">
+              {viewingPast ? "最終入札額" : "現在の入札額"}
+            </div>
             <div className="stat-value">
               Ξ{" "}
-              {state ? (
+              {viewingPast ? (
+                stageLot.finalAmount ? (
+                  formatEther(BigInt(stageLot.finalAmount))
+                ) : (
+                  "—"
+                )
+              ) : state ? (
                 <DigitPop value={formatEther(state.highestBid)} />
               ) : (
                 "—"
               )}
             </div>
             <div className="stat-meta">
-              最高入札者 {shortAddr(state?.highestBidder)}
+              {viewingPast
+                ? `最終入札者 ${shortAddr(stageLot.bids[0]?.bidder)}`
+                : `最高入札者 ${shortAddr(state?.highestBidder)}`}
             </div>
-            {state && state.id > 0n && (
+            {state && state.id > 0n && !viewingPast && (
               <div className="lot-actions">
                 <button
                   type="button"
@@ -722,6 +813,7 @@ export default function App() {
             )}
           </div>
 
+          {!viewingPast && (
           <div className="stat-block">
             <div className="stat-label">
               {state?.settled
@@ -747,14 +839,16 @@ export default function App() {
                   : countdownLabel}
             </div>
           </div>
+          )}
 
-          {isScheduled && (
+          {!viewingPast && isScheduled && (
             <p className="schedule-note">
               開始時刻になると自動で入札可能になります（運営の操作不要）。
               初回入札でオンチェーン記録を残そう。
             </p>
           )}
 
+          {!viewingPast && (
           <div className="bridge-help">
             <div className="bridge-help-title">入札の前に · Base 上の ETH</div>
             <p>
@@ -779,6 +873,7 @@ export default function App() {
               </li>
             </ul>
           </div>
+          )}
 
           {showBid && (
             <div className="bid-row">
@@ -885,6 +980,7 @@ export default function App() {
             </p>
           )}
 
+          {!viewingPast && (
           <dl className="details">
             <div>
               <dt>minted</dt>
@@ -899,6 +995,7 @@ export default function App() {
               <dd>{shortAddr(state?.proceedsTo)}</dd>
             </div>
           </dl>
+          )}
         </section>
       </main>
 
@@ -918,6 +1015,9 @@ export default function App() {
         endTime={state?.endTime}
         open={bidHistoryOpen}
         onClose={() => setBidHistoryOpen(false)}
+        onShowOnStage={(id) => {
+          void showStageId(id);
+        }}
       />
 
       <section className="about">

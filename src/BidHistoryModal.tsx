@@ -10,6 +10,7 @@ import {
   type Log,
 } from "viem";
 import { AUCTION_ADDRESS, AUCTION_DEPLOY_BLOCK, CHAIN, RPC_URLS, arweaveToHttp } from "./config";
+import { SAVED_LOTS, fetchSavedLot, savedFile, type SavedLot } from "./savedLots";
 
 export type BidRow = {
   bidder: Address;
@@ -47,11 +48,7 @@ const client = createPublicClient({
   transport: http(RPC_URLS[0], { timeout: 12_000, retryCount: 0 }),
 });
 
-/** Settled lots. The file is fetched on the arrow click. No node. */
-const SAVED_LOTS: { id: bigint; file: string }[] = [
-  { id: 1n, file: "history/lot-1.json" },
-];
-
+/** Settled lots live in savedLots.ts. The file is fetched on the arrow click. No node. */
 type SavedBid = {
   bidder: string;
   amount: string;
@@ -60,18 +57,6 @@ type SavedBid = {
   txHash: string;
   timestamp: number;
 };
-
-type SavedLot = {
-  id: string;
-  name: string;
-  image: string;
-  tokenURI: string;
-  bids: SavedBid[];
-};
-
-function savedFile(id: bigint): string | null {
-  return SAVED_LOTS.find((s) => s.id === id)?.file ?? null;
-}
 
 function withSavedLots(
   list: LotInfo[],
@@ -91,10 +76,9 @@ function withSavedLots(
 }
 
 async function loadSavedLot(file: string): Promise<SavedLot> {
-  const url = `${import.meta.env.BASE_URL}${file}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("saved history missing");
-  return res.json();
+  const id = SAVED_LOTS.find((s) => s.file === file)?.id;
+  if (id == null) throw new Error("saved history missing");
+  return fetchSavedLot(id);
 }
 
 function savedToRows(snap: SavedLot): BidRow[] {
@@ -471,6 +455,7 @@ type Props = {
   endTime?: bigint;
   open: boolean;
   onClose: () => void;
+  onShowOnStage?: (id: bigint) => void;
 };
 
 export function BidHistoryModal({
@@ -482,6 +467,7 @@ export function BidHistoryModal({
   endTime,
   open,
   onClose,
+  onShowOnStage,
 }: Props) {
   const [lots, setLots] = useState<LotInfo[]>([]);
   const [viewId, setViewId] = useState<bigint>(currentAuctionId);
@@ -714,6 +700,11 @@ export function BidHistoryModal({
     meta.name && meta.name.trim() && meta.name.trim() !== lotLabel
       ? meta.name.trim()
       : null;
+  const canStage = Boolean(onShowOnStage && savedFile(viewId));
+  const showOnStage = () => {
+    if (!onShowOnStage || !savedFile(viewId)) return;
+    onShowOnStage(viewId);
+  };
 
   return (
     <div
@@ -745,19 +736,37 @@ export function BidHistoryModal({
             ‹
           </button>
           <div className="modal-lot">
-            {meta.image ? (
-              <img src={meta.image} alt="" className="modal-thumb" />
+            {canStage ? (
+              <button
+                type="button"
+                className="modal-stage-hit"
+                onClick={showOnStage}
+                aria-label="このロットをこの端末に表示"
+              >
+                {meta.image ? (
+                  <img src={meta.image} alt="" className="modal-thumb" />
+                ) : (
+                  <div className="modal-thumb placeholder">武</div>
+                )}
+                <span className="modal-title">{displayTitle || lotLabel}</span>
+              </button>
             ) : (
-              <div className="modal-thumb placeholder">武</div>
-            )}
-            <div>
-              <div className="modal-kicker">{lotLabel}</div>
-              {displayTitle && (
-                <div className="modal-title" title={displayTitle}>
-                  {displayTitle}
+              <>
+                {meta.image ? (
+                  <img src={meta.image} alt="" className="modal-thumb" />
+                ) : (
+                  <div className="modal-thumb placeholder">武</div>
+                )}
+                <div>
+                  <div className="modal-kicker">{lotLabel}</div>
+                  {displayTitle && (
+                    <div className="modal-title" title={displayTitle}>
+                      {displayTitle}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
           <button
             type="button"
