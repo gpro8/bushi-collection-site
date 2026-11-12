@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createPublicClient,
   formatEther,
+  getAddress,
   http,
   parseAbiItem,
   type Address,
@@ -45,6 +46,67 @@ const client = createPublicClient({
   chain: CHAIN,
   transport: http(RPC_URLS[0], { timeout: 12_000, retryCount: 0 }),
 });
+
+/** Settled lots. The file is fetched on the arrow click. No node. */
+const SAVED_LOTS: { id: bigint; file: string }[] = [
+  { id: 1n, file: "history/lot-1.json" },
+];
+
+type SavedBid = {
+  bidder: string;
+  amount: string;
+  endTime: string;
+  blockNumber: string;
+  txHash: string;
+  timestamp: number;
+};
+
+type SavedLot = {
+  id: string;
+  name: string;
+  image: string;
+  tokenURI: string;
+  bids: SavedBid[];
+};
+
+function savedFile(id: bigint): string | null {
+  return SAVED_LOTS.find((s) => s.id === id)?.file ?? null;
+}
+
+function withSavedLots(
+  list: LotInfo[],
+  currentId: bigint,
+  currentURI: string
+): LotInfo[] {
+  const map = new Map(list.map((l) => [l.id.toString(), l]));
+  for (const s of SAVED_LOTS) {
+    if (!map.has(s.id.toString())) {
+      map.set(s.id.toString(), { id: s.id, tokenURI: "" });
+    }
+  }
+  if (!map.has(currentId.toString())) {
+    map.set(currentId.toString(), { id: currentId, tokenURI: currentURI });
+  }
+  return [...map.values()].sort((a, b) => Number(a.id - b.id));
+}
+
+async function loadSavedLot(file: string): Promise<SavedLot> {
+  const url = `${import.meta.env.BASE_URL}${file}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("saved history missing");
+  return res.json();
+}
+
+function savedToRows(snap: SavedLot): BidRow[] {
+  return snap.bids.map((b) => ({
+    bidder: getAddress(b.bidder),
+    amount: BigInt(b.amount),
+    endTime: BigInt(b.endTime || "0"),
+    blockNumber: BigInt(b.blockNumber),
+    txHash: b.txHash as Hex,
+    timestamp: b.timestamp,
+  }));
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -427,6 +489,7 @@ export function BidHistoryModal({
   const [meta, setMeta] = useState<{ name?: string; image?: string }>({});
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [savedView, setSavedView] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const cursorRef = useRef<ScanCursor | null>(null);
@@ -448,10 +511,14 @@ export function BidHistoryModal({
     return () => window.clearTimeout(t);
   }, [open]);
 
-  // Reset view when opened
   useEffect(() => {
     if (open) setViewId(currentAuctionId);
   }, [open, currentAuctionId]);
+
+  useEffect(() => {
+    if (!open) return;
+    setLots((cur) => withSavedLots(cur, currentAuctionId, currentTokenURI || ""));
+  }, [open, currentAuctionId, currentTokenURI]);
 
   const startFreshScan = useCallback(
     async (id: bigint) => {
@@ -468,6 +535,26 @@ export function BidHistoryModal({
       } else {
         setMeta({});
       }
+
+      const file = savedFile(id);
+      if (file) {
+        try {
+          const snap = await loadSavedLot(file);
+          if (gen !== loadGen.current) return;
+          setMeta({ name: snap.name, image: snap.image });
+          setBids(savedToRows(snap));
+          setDone(true);
+          setSavedView(true);
+          setLoading(false);
+          setLots((cur) => withSavedLots(cur, currentAuctionId, currentTokenURI || ""));
+        } catch {
+          if (gen !== loadGen.current) return;
+          setErr("記録の読み込みに失敗しました");
+          setLoading(false);
+        }
+        return;
+      }
+      setSavedView(false);
 
       try {
         const latest = await client.getBlockNumber();
@@ -515,7 +602,7 @@ export function BidHistoryModal({
                 (a, b) => Number(a.id - b.id)
               );
             }
-            setLots(list);
+            setLots(withSavedLots(list, currentAuctionId, currentTokenURI || ""));
             if (id !== currentAuctionId) {
               const lot = list.find((l) => l.id === id);
               resolveLotMeta(lot?.tokenURI || "").then((m) => {
@@ -751,7 +838,9 @@ export function BidHistoryModal({
         )}
 
         <p className="modal-foot-note">
-          開くたびに最新を取得 · スクロールで過去分を追加 · ローカル時刻
+          {savedView
+            ? "記録済みの履歴 · ローカル時刻"
+            : "開くたびに最新を取得 · スクロールで過去分を追加 · ローカル時刻"}
         </p>
       </div>
     </div>

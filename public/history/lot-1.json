@@ -1,0 +1,105 @@
+{
+  "id": "1",
+  "name": "Bushi Collection #1 — 「KAKUSHI-N」",
+  "image": "https://arweave.net/R3-Ovr5wQfx_aw1JeEd7iYNOwCOc1M6Kbq2bRj6tCmg",
+  "tokenURI": "https://arweave.net/VChDdedqn1cGFnpvT8XMV1B02OvEOEvcVZzyvnvyGn8",
+  "note": "Saved once from chain. The page reads this file. It does not ask a node for lot 1.",
+  "bids": [
+    {
+      "bidder": "0x0d546afb4bda5e60c4d31bde126cb3700ea8977a",
+      "amount": "120000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52162362",
+      "txHash": "0x950ae3fb0bf232c9a34f3127aea2b9fd94041f9ed1390e04589523598c3e6e95",
+      "timestamp": 1791114071
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "110000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52161732",
+      "txHash": "0x910e8a405ea3df1f5825f7576a9c8f8693c82af396002d5d67a2a15d4e31b373",
+      "timestamp": 1791112811
+    },
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "100000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52161676",
+      "txHash": "0x5665a2481fe125ac156ebb04d62c96b79549abf46c73abbe21fed0cf7c0463c2",
+      "timestamp": 1791112699
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "90000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52161432",
+      "txHash": "0x417ba4b576ffc4a0b46e806b4fc60d3204b35860f617a1ee2adaf04315297d69",
+      "timestamp": 1791112211
+    },
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "80000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52161248",
+      "txHash": "0x31066f8c4c74b7902e77b945e0462611809620267f291dd2517e94e81a9542f5",
+      "timestamp": 1791111843
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "70000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52161171",
+      "txHash": "0xf90c7a189e84ee1fb6710fa60c8f64552ed9eed04a35a69303c1083448f4d1e5",
+      "timestamp": 1791111689
+    },
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "60000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52155110",
+      "txHash": "0xb7d32e9a19f4da39186e9182e749bc1ee60ebad6b704a3d4372e4e5f895dc667",
+      "timestamp": 1791099567
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "50000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52140808",
+      "txHash": "0xddd12360015c69835a8005c64f516d3a422efe99267fb41ac1728a86da74c18b",
+      "timestamp": 1791070963
+    },
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "40000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52081093",
+      "txHash": "0xefef9d5d46d285dec7a5c218cfde8dac2873149c65bbee3f609f73cd17e87b6c",
+      "timestamp": 1790951533
+    },
+    {
+      "bidder": "0x0d546afb4bda5e60c4d31bde126cb3700ea8977a",
+      "amount": "30000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52074289",
+      "txHash": "0xf5ecb799cc8b18ed316a263adef20f027a365a511a00a1bc05661d7423cffbf0",
+      "timestamp": 1790937925
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "20000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52033472",
+      "txHash": "0xf470202c0259f57aa21b2e77bc42746ce260da0b8a8e9fc093ffae2de5771f3a",
+      "timestamp": 1790856291
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "10000000000000000",
+      "endTime": "1791115200",
+      "blockNumber": "52033336",
+      "txHash": "0x7bf3257efa1b6f2cb1a4d1e04b752cecc82ad20798bbc352fba81104aafb595d",
+      "timestamp": 1790856019
+    }
+  ]
+}
