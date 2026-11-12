@@ -10,7 +10,11 @@ import "./styles.css";
 /** Apply theme before paint to avoid flash (auction defaults dark) */
 initTheme("dark");
 
-const qc = new QueryClient();
+const qc = new QueryClient({
+  defaultOptions: {
+    queries: { retry: 1, retryDelay: 3000 },
+  },
+});
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

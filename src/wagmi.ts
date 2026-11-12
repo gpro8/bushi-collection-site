@@ -1,4 +1,4 @@
-import { http, fallback, createConfig } from "wagmi";
+import { http, createConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
 import type { Chain } from "viem";
 import { CHAIN, RPC_URLS } from "./config";
@@ -10,9 +10,6 @@ export const wagmiConfig = createConfig({
   chains: [chain],
   connectors: [injected({ shimDisconnect: true })],
   transports: {
-    [chain.id]: fallback(
-      RPC_URLS.map((u) => http(u, { timeout: 12_000, retryCount: 0 })),
-      { rank: false, retryCount: 0 }
-    ),
+    [chain.id]: http(RPC_URLS[0], { timeout: 12_000, retryCount: 0 }),
   },
 });

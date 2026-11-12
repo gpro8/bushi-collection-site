@@ -18,21 +18,18 @@ export const AUCTION_ABI = auctionAbi as readonly unknown[];
 /** Browser RPC = public chain node (per-visitor IP). Never bake Alchemy. */
 export const RPC_URL = d.rpcFallback;
 /**
- * Keyless pool, device → node. Order is fail-over, not a race.
- * thirdweb answered the live eth_getLogs shape (499 blocks, auction topic).
- * Official is last: 5 req/s, body `request limit reached`.
- * Not base.drpc.org — free plan returns HTTP 400
- * "ranges over 10000 blocks" even on a 499-block window, so every
- * history chunk prints a 400 and then hits the other nodes.
- * Not publicnode — old getLogs asks for an Allnodes token.
+ * One keyless node. Do not fail over in the same tick.
+ * A 429 on the first host was immediately sent to the second, so the
+ * console filled with pairs and neither host could recover.
+ * publicnode answered eth_call and a 499-block tip eth_getLogs.
+ * Old windows still want an Allnodes token — do not walk back to the
+ * deploy block on this host.
+ * Not base.drpc.org (HTTP 400 on a 499-block log query).
  * Not Alchemy. Do not read VITE_RPC_URL.
  */
 export const RPC_URLS: string[] =
   d.id === "mainnet"
-    ? [
-        "https://base.rpc.thirdweb.com",
-        "https://mainnet.base.org",
-      ]
+    ? ["https://base-rpc.publicnode.com"]
     : ["https://sepolia.base.org"];
 
 export const EXPLORER = d.explorer;

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createPublicClient,
-  fallback,
   formatEther,
   http,
   parseAbiItem,
@@ -44,10 +43,7 @@ const createdEvent = parseAbiItem(
 
 const client = createPublicClient({
   chain: CHAIN,
-  transport: fallback(
-    RPC_URLS.map((u) => http(u, { timeout: 12_000, retryCount: 0 })),
-    { rank: false, retryCount: 0 }
-  ),
+  transport: http(RPC_URLS[0], { timeout: 12_000, retryCount: 0 }),
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -189,8 +185,11 @@ async function getLogsOnce(params: {
         logSpan = parsed < 1n ? 1n : parsed;
         return getLogsOnce({ event, args, fromBlock, toBlock });
       }
-      if ((isRateLimited(e) || /timeout/i.test(msg)) && attempt < 4) {
-        await sleep(1200 * (attempt + 1));
+      if (/archive|personal token|allnodes/i.test(msg)) {
+        throw e;
+      }
+      if ((isRateLimited(e) || /timeout/i.test(msg)) && attempt < 1) {
+        await sleep(2000);
         continue;
       }
       throw e;
