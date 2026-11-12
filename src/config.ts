@@ -19,15 +19,17 @@ export const AUCTION_ABI = auctionAbi as readonly unknown[];
 export const RPC_URL = d.rpcFallback;
 /**
  * Keyless pool, device → node. Order is fail-over, not a race.
- * drpc and thirdweb answered eth_getLogs on a recent window and on the
- * deploy block. Official is last: 5 req/s, body `request limit reached`.
+ * thirdweb answered the live eth_getLogs shape (499 blocks, auction topic).
+ * Official is last: 5 req/s, body `request limit reached`.
+ * Not base.drpc.org — free plan returns HTTP 400
+ * "ranges over 10000 blocks" even on a 499-block window, so every
+ * history chunk prints a 400 and then hits the other nodes.
  * Not publicnode — old getLogs asks for an Allnodes token.
  * Not Alchemy. Do not read VITE_RPC_URL.
  */
 export const RPC_URLS: string[] =
   d.id === "mainnet"
     ? [
-        "https://base.drpc.org",
         "https://base.rpc.thirdweb.com",
         "https://mainnet.base.org",
       ]
