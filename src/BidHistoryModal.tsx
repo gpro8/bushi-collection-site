@@ -24,8 +24,8 @@ export type LotInfo = {
   tokenURI: string;
 };
 
-/** Preferred window. mainnet.base.org rejects above 500 (“limited to a 500 range”). */
-const LOG_CHUNK_DEFAULT = 499n;
+/** publicnode accepted a 4000-block window. Shrink on a range error. */
+const LOG_CHUNK_DEFAULT = 3999n;
 let logSpan = LOG_CHUNK_DEFAULT;
 /** Stay under mainnet.base.org (5 req / 1s). 50ms bursts trip “request limit reached”. */
 const CHUNK_DELAY_MS = 350;
@@ -256,24 +256,27 @@ function lotCeiling(latest: bigint, endTime?: bigint): bigint {
   if (endTime == null || endTime === 0n) return latest;
   const now = BigInt(Math.floor(Date.now() / 1000));
   if (endTime >= now) return latest;
-  const after = now - endTime;
-  const blocks = after / 2n;
-  const est = latest > blocks ? latest - blocks : latest;
-  const padded = est + 3600n;
-  return padded < latest ? padded : latest;
+  return latest;
 }
 
-function lotFloor(latest: bigint, startTime?: bigint): bigint {
-  const deploy = AUCTION_DEPLOY_BLOCK;
-  if (startTime == null || startTime === 0n) return deploy;
-  const now = BigInt(Math.floor(Date.now() / 1000));
-  if (startTime >= now) {
-    return latest > 300n ? latest - 300n : deploy;
+/** First block at or just before `ts`. Do not guess 2s blocks — Base was ~0.2s. */
+async function blockAtOrAfter(latest: bigint, ts: bigint): Promise<bigint> {
+  let lo = AUCTION_DEPLOY_BLOCK;
+  let hi = latest;
+  while (lo < hi) {
+    const mid = (lo + hi) / 2n;
+    try {
+      const b = await client.getBlock({ blockNumber: mid });
+      if (b.timestamp < ts) lo = mid + 1n;
+      else hi = mid;
+    } catch (e) {
+      if (/archive|personal token|allnodes/i.test(errorBlob(e))) lo = mid + 1n;
+      else throw e;
+    }
+    await sleep(80);
   }
-  const elapsed = now - startTime;
-  const blocks = elapsed / 2n + 1800n; // Base ~2s + 1h pad
-  const est = latest > blocks ? latest - blocks : 0n;
-  return est > deploy ? est : deploy;
+  const pad = 30n;
+  return lo > AUCTION_DEPLOY_BLOCK + pad ? lo - pad : AUCTION_DEPLOY_BLOCK;
 }
 
 function chunksForRange(from: bigint, to: bigint): number {
@@ -469,20 +472,34 @@ export function BidHistoryModal({
       try {
         const latest = await client.getBlockNumber();
         if (gen !== loadGen.current) return;
-        const floor = lotFloor(latest, startTime);
+        const floor =
+          startTime && startTime > 0n
+            ? await blockAtOrAfter(latest, startTime)
+            : AUCTION_DEPLOY_BLOCK;
+        if (gen !== loadGen.current) return;
         const ceiling = lotCeiling(latest, endTime);
         let cursor = freshCursor(ceiling, floor);
-        const page = await scanBidsPage(
-          id,
-          cursor,
-          INITIAL_BID_TARGET,
-          chunksForRange(floor, ceiling)
-        );
-        if (gen !== loadGen.current) return;
-        cursorRef.current = page.cursor;
-        setBids(mergeBids([], page.bids));
-        setDone(page.done);
+        let acc: BidRow[] = [];
+        let pageDone = false;
+        setLoadingMore(true);
+        while (!pageDone) {
+          if (!cursor || cursor.nextTo < cursor.floor) {
+            pageDone = true;
+            break;
+          }
+          const page = await scanBidsPage(id, cursor, 1000, 12);
+          if (gen !== loadGen.current) return;
+          cursor = page.cursor;
+          cursorRef.current = cursor;
+          acc = mergeBids(acc, page.bids);
+          setBids(acc);
+          pageDone = page.done;
+          setDone(pageDone);
+          setLoading(false);
+        }
+        setDone(true);
         setLoading(false);
+        setLoadingMore(false);
 
         // Lots in background (for ‹ › only)
         fetchLotsOnce()
@@ -521,6 +538,7 @@ export function BidHistoryModal({
         if (gen !== loadGen.current) return;
         setErr(friendlyLogsError(e));
         setLoading(false);
+        setLoadingMore(false);
       }
     },
     [currentAuctionId, currentTokenURI, currentTitle, currentImage, startTime, endTime]
