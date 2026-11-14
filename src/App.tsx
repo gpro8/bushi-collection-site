@@ -319,6 +319,7 @@ export default function App() {
   const [artBroken, setArtBroken] = useState(false);
   const [bidHistoryOpen, setBidHistoryOpen] = useState(false);
   const [stageLot, setStageLot] = useState<SavedLot | null>(null);
+  const [settledSnap, setSettledSnap] = useState<SavedLot | null>(null);
   const [bidInput, setBidInput] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [bidShake, setBidShake] = useState(false);
@@ -329,6 +330,24 @@ export default function App() {
       requestAnimationFrame(() => setBidShake(true));
     });
   }, []);
+
+  useEffect(() => {
+    if (!state?.settled || !state.id) {
+      setSettledSnap(null);
+      return;
+    }
+    let cancel = false;
+    fetchSavedLot(state.id)
+      .then((lot) => {
+        if (!cancel) setSettledSnap(lot);
+      })
+      .catch(() => {
+        if (!cancel) setSettledSnap(null);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [state?.settled, state?.id]);
 
   useEffect(() => {
     let cancel = false;
@@ -484,6 +503,10 @@ export default function App() {
   );
   const desc = (meta.description || "").trim();
   const viewingPast = stageLot != null;
+  const settledFinal =
+    !viewingPast && state?.settled && settledSnap?.finalAmount
+      ? settledSnap.finalAmount
+      : null;
   const shownTitle = viewingPast && stageLot.name ? stageLot.name : title;
   const shownArt = viewingPast && stageLot.image ? stageLot.image : artUrl;
   const shownAttrs = viewingPast ? stageLot.attributes || [] : attrs;
@@ -746,7 +769,7 @@ export default function App() {
 
           <div className="stat-block">
             <div className="stat-label">
-              {viewingPast ? "最終入札額" : "現在の入札額"}
+              {viewingPast || settledFinal ? "最終入札額" : "現在の入札額"}
             </div>
             <div className="stat-value">
               Ξ{" "}
@@ -756,6 +779,8 @@ export default function App() {
                 ) : (
                   "—"
                 )
+              ) : settledFinal ? (
+                formatEther(BigInt(settledFinal))
               ) : state ? (
                 <DigitPop value={formatEther(state.highestBid)} />
               ) : (
@@ -765,7 +790,9 @@ export default function App() {
             <div className="stat-meta">
               {viewingPast
                 ? `最終入札者 ${shortAddr(stageLot.bids[0]?.bidder)}`
-                : `最高入札者 ${shortAddr(state?.highestBidder)}`}
+                : settledFinal
+                  ? `最終入札者 ${shortAddr(settledSnap?.bids[0]?.bidder)}`
+                  : `最高入札者 ${shortAddr(state?.highestBidder)}`}
             </div>
             {state && state.id > 0n && !viewingPast && (
               <div className="lot-actions">
@@ -784,7 +811,11 @@ export default function App() {
                   href={xIntentUrl(
                     buildAuctionShare({
                       title,
-                      bidEth: state ? formatEther(state.highestBid) : "0",
+                      bidEth: settledFinal
+                        ? formatEther(BigInt(settledFinal))
+                        : state
+                          ? formatEther(state.highestBid)
+                          : "0",
                       startJst: state ? fmtJst(state.startTime) : "",
                       endJst: state ? fmtJst(state.endTime) : "",
                       phase: isScheduled
