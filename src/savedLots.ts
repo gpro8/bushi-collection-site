@@ -29,6 +29,13 @@ export function savedFile(id: bigint): string | null {
   return SAVED_LOTS.find((s) => s.id === id)?.file ?? null;
 }
 
+export function savedImageSrc(image: string) {
+  if (!image) return "";
+  if (/^https?:/i.test(image)) return image;
+  const base = import.meta.env.BASE_URL || "/";
+  return `${base}${image.replace(/^\//, "")}`;
+}
+
 export async function fetchSavedLot(id: bigint): Promise<SavedLot> {
   const file = savedFile(id);
   if (!file) throw new Error("saved history missing");

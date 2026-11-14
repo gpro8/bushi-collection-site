@@ -23,7 +23,7 @@ import {
   arweaveToHttp,
 } from "./config";
 import { fmtCountdown, fmtJst } from "./timeJst";
-import { SAVED_LOTS, fetchSavedLot, savedFile, type SavedLot } from "./savedLots";
+import { SAVED_LOTS, fetchSavedLot, savedFile, savedImageSrc, type SavedLot } from "./savedLots";
 import { initTheme, toggleTheme, type ThemeMode } from "./theme";
 
 type AuctionState = {
@@ -99,7 +99,7 @@ function buildAuctionShare(opts: {
       lines.push(`落札 Ξ ${opts.bidEth}`);
     }
     if (opts.endJst) lines.push(`終了 ${opts.endJst}`);
-    lines.push("次の出品はサイトで");
+    lines.push("次の作品はサイトで");
     lines.push(url);
     return lines.join("\n");
   }
@@ -352,6 +352,9 @@ export default function App() {
   useEffect(() => {
     let cancel = false;
     (async () => {
+      if (stageLot || (state?.settled && state.id && savedFile(state.id))) {
+        return;
+      }
       if (!state?.tokenURI) {
         setArtUrl("");
         setMeta({});
@@ -368,7 +371,7 @@ export default function App() {
     return () => {
       cancel = true;
     };
-  }, [state?.tokenURI]);
+  }, [state?.tokenURI, state?.settled, state?.id, stageLot]);
 
   const minNextBid = useMemo(() => {
     if (!state) return 0n;
@@ -521,7 +524,7 @@ export default function App() {
       : title;
   const shownArt =
     viewingPast && stageLot.image
-      ? stageLot.image
+      ? savedImageSrc(stageLot.image)
       : showingSoon
         ? ""
         : artUrl;
@@ -729,7 +732,7 @@ export default function App() {
             </button>
             <p className="eyebrow">
               {showingSoon
-                ? "次の出品"
+                ? "次の作品"
                 : viewingPast
                   ? "落札済み"
                   : state?.live
@@ -765,7 +768,7 @@ export default function App() {
           {viewingPast && (
             <p className="stage-note">
               {gapNext
-                ? "この表示はこの端末だけです · › で次の出品へ"
+                ? "この表示はこの端末だけです · › で次の作品へ"
                 : "この表示はこの端末だけです · 入札は › で現在のロットへ"}
             </p>
           )}
@@ -812,7 +815,7 @@ export default function App() {
 
           {showingSoon ? (
             <div className="soon-copy">
-              <p>作品と開始時刻は、出品が載ってから。</p>
+              <p>開始時刻は、作品が載ってから。</p>
               <p className="stage-note">‹ でこれまでの作品。</p>
             </div>
           ) : (
@@ -1120,7 +1123,7 @@ export default function App() {
         <h2>これはなに？</h2>
         <p>
           <strong>Bushi Collection</strong> は Base 上の English
-          オークションです。1点ずつ出品され、最高入札者が settle 後に NFT
+          オークションです。1点ずつ作品が並び、最高入札者が settle 後に NFT
           を受け取ります。売上はクリエイターへ 100%（ロット作成時に固定）。
           開始と終了は、このページの時計どおり。
         </p>

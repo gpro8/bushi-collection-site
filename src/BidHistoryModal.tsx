@@ -10,7 +10,7 @@ import {
   type Log,
 } from "viem";
 import { AUCTION_ADDRESS, AUCTION_DEPLOY_BLOCK, CHAIN, RPC_URLS, arweaveToHttp } from "./config";
-import { SAVED_LOTS, fetchSavedLot, savedFile, type SavedLot } from "./savedLots";
+import { SAVED_LOTS, fetchSavedLot, savedFile, savedImageSrc, type SavedLot } from "./savedLots";
 
 export type BidRow = {
   bidder: Address;
@@ -529,7 +529,7 @@ export function BidHistoryModal({
         try {
           const snap = await loadSavedLot(file);
           if (gen !== loadGen.current) return;
-          setMeta({ name: snap.name, image: snap.image });
+          setMeta({ name: snap.name, image: savedImageSrc(snap.image) });
           setBids(savedToRows(snap));
           setDone(true);
           setSavedView(true);
