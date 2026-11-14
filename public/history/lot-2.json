@@ -1,0 +1,380 @@
+{
+  "id": "2",
+  "name": "Bushi Collection #2 — 「SUN-GOD」",
+  "image": "https://arweave.net/BwhFbFmmUcHHNs36WD0VtJCbgN0dZjPsdoV1kcX9OlY",
+  "tokenURI": "https://arweave.net/zODXzBg_Nhd3rRKp5r4yEoJORSqLlkgLR06y2_VFpCk",
+  "note": "Saved once from chain. The page reads this file. It does not ask a node for lot 2.",
+  "bids": [
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "116000000000000000",
+      "endTime": "1794659400",
+      "blockNumber": "57342225",
+      "txHash": "0xbbf2e8ade3e650e77744ea24b91b1170e0bc389a140daf8626e97fa896e5df84",
+      "timestamp": 1794658820
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "99000000000000000",
+      "endTime": "1794659040",
+      "blockNumber": "57340070",
+      "txHash": "0x28b54dc54c58e3e8426ef7d5338f5bb98a89df9611540d4e28488a03a76fb6a8",
+      "timestamp": 1794658389
+    },
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "98000000000000000",
+      "endTime": "1794658680",
+      "blockNumber": "57338501",
+      "txHash": "0xbb9ba639834d31d884a6424b7dc5956954e21dbe49323216ce39c7c0e8883b9d",
+      "timestamp": 1794658075
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "96000000000000000",
+      "endTime": "1794658680",
+      "blockNumber": "57338257",
+      "txHash": "0x38251b08fae141708c260fe4bbe83e53439ccbdbb80a1e4c1c60c58f8c3494a8",
+      "timestamp": 1794658027
+    },
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "89000000000000000",
+      "endTime": "1794658320",
+      "blockNumber": "57336683",
+      "txHash": "0xca3955dee254cb8d6527bcd2ee03dcecfd92edbf02ff281a96dd39bb3db2223b",
+      "timestamp": 1794657712
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "81000000000000000",
+      "endTime": "1794658320",
+      "blockNumber": "57336535",
+      "txHash": "0xae2d50025a8277602cfc28313207d2df401b18d4075bc96b63f1f1937a23bb78",
+      "timestamp": 1794657682
+    },
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "80000000000000000",
+      "endTime": "1794657960",
+      "blockNumber": "57336053",
+      "txHash": "0xa101bc6b51102072a20655521bb2e172fe6172ff76b1912553a3016efc115f41",
+      "timestamp": 1794657586
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "79000000000000000",
+      "endTime": "1794657960",
+      "blockNumber": "57335789",
+      "txHash": "0x127275975c059c455bbe403f4a2ffbf9afdc812242c2660cd1cbdd43d719708c",
+      "timestamp": 1794657533
+    },
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "71000000000000000",
+      "endTime": "1794657960",
+      "blockNumber": "57335069",
+      "txHash": "0xd8f82421ad7527e3fd720e4e7fb6bbcadc36f3def806e00345b7445d943e2fe1",
+      "timestamp": 1794657389
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "54000000000000000",
+      "endTime": "1794657960",
+      "blockNumber": "57334667",
+      "txHash": "0x65b42d045f9076696f24dc0020eef39550d9a5b49be8f791e0c765f688e944f1",
+      "timestamp": 1794657309
+    },
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "53000000000000000",
+      "endTime": "1794657960",
+      "blockNumber": "57334570",
+      "txHash": "0x0c1f7481a887c2b13a11d202fb974c98421c2d7138126967f308608a067757fc",
+      "timestamp": 1794657289
+    },
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "44000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57333619",
+      "txHash": "0x4589f41d4bdc6165eaded1649651d9f3c141f2b0dd11efc2d0fcac73de98b49b",
+      "timestamp": 1794657099
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "30000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57333535",
+      "txHash": "0xad9d3f7dc3b9b54b52904584ed00866a48de7bd9844af334ff98f9e0d75fa685",
+      "timestamp": 1794657082
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "29000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57333309",
+      "txHash": "0x24087f52d03833c16ce525647ac3f742e47d5c5730f109e86d90ff5ac9fcab77",
+      "timestamp": 1794657037
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "28000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57333211",
+      "txHash": "0x11ebd5f44acf82b3a6122ff1f43d05234aed077702a10cb4ff2cc6b922355a3b",
+      "timestamp": 1794657017
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "27000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57331150",
+      "txHash": "0xfd6249af9f24985ec7f4375f6404257da9ec277145e25407e9ff2115dd53870a",
+      "timestamp": 1794656605
+    },
+    {
+      "bidder": "0xd06584400f55099ee2c872b53a48f1ff85067c4a",
+      "amount": "26000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57326947",
+      "txHash": "0x5bf40a6a03c856735a71ec776bb2c2accc667188160205703962fcbb162d8007",
+      "timestamp": 1794655765
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "25000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57242013",
+      "txHash": "0xade4383d21c7600e311d049a71964305ca1d4dc4161b8d3b6814866c418276e7",
+      "timestamp": 1794638778
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "24000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57210457",
+      "txHash": "0xb87be58abacbebf231bc0a1148f7bb466e417f7a36315b2760c5f256b1726287",
+      "timestamp": 1794632467
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "23000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57205207",
+      "txHash": "0xfbcf3353945546a30831417f344127545c1ad2b5775f40f912fa4412b83670dd",
+      "timestamp": 1794631417
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "22000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57202972",
+      "txHash": "0x1758b29b943b40f49a5a38473dd0ed2e27e40422b8cdc1a4d81ffc60dd17c15d",
+      "timestamp": 1794630970
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "21000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57195477",
+      "txHash": "0xf6e6ac781efe84bc6f890a279bb537a54e49db42ba0eee442e618f8b096c25aa",
+      "timestamp": 1794629471
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "20000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57192928",
+      "txHash": "0x87e3d2ccab5b3b42bd883db8207d38fac5be05490b0911a99768a86591b99e3f",
+      "timestamp": 1794628961
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "19000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57192150",
+      "txHash": "0x32639ba6b6c151d5e2ada6f71d32f4350b46bc3dfa82fe2c9531d589efca460b",
+      "timestamp": 1794628805
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "18000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57119467",
+      "txHash": "0x7e595d0615cb26058d57267f8b3c572b9cc84cc76c1f62bc14a29e9a6ac4bc0e",
+      "timestamp": 1794614269
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "17000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57080482",
+      "txHash": "0x7890ac3d61ab422662d5867cd809c637357781f6c115da20f23a0dd5c5514a90",
+      "timestamp": 1794606472
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "16000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "57061271",
+      "txHash": "0xc16e734c4bc6584157e9517a3230e52da541a4072399fee4b5af207af407a79c",
+      "timestamp": 1794602629
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "15000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56810843",
+      "txHash": "0x5537be894b98b86e23883eafb8d147da98b109f1ebdafac0cb9dad4a26faac20",
+      "timestamp": 1794552544
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "14000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56740846",
+      "txHash": "0xb8b1d13fb1ecba1ea6c5e9e3cdc31073bb5ca78da692647ef1c684d0232a60f7",
+      "timestamp": 1794538544
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "13000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56698952",
+      "txHash": "0x2c99567ca0e5c152f4d0aa03204ddd3829c24d800e42bfbaf149e17f9ee40087",
+      "timestamp": 1794530166
+    },
+    {
+      "bidder": "0x52c588ceb791f755304ef4dbb2edd50abf6fb43a",
+      "amount": "12000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56547979",
+      "txHash": "0x6cd7e73f820b9055cfc2d778b69486650a8981b7ede5c71e848f89860d9cb9e6",
+      "timestamp": 1794499971
+    },
+    {
+      "bidder": "0x4cea0b9e396bdadf051bebb8187e8ab26d41a3d6",
+      "amount": "11000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56506071",
+      "txHash": "0xcd541c4d0c9b2478d9ec7841c356fb0e5d5260b2dc0d0c85faee14691cf39b00",
+      "timestamp": 1794491589
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "10000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56497805",
+      "txHash": "0xbd7323aafe275ee68e29b53a5ddd3c64cbbfb06dfb8dde0a9f5cbc0ad761f926",
+      "timestamp": 1794489936
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "7000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56409202",
+      "txHash": "0x37f42e55febcebadb0bd4d99b6d90c3a48a03fc2981bffc38b327a1e1b51a254",
+      "timestamp": 1794472216
+    },
+    {
+      "bidder": "0x64614ebc083c2eb63b29421ca90a06226c5174a1",
+      "amount": "6000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56046710",
+      "txHash": "0xadbf30409abdcb76fd521cb5cc79c1c96e33d2cbc1576d84dad073f656fc6b4a",
+      "timestamp": 1794399717
+    },
+    {
+      "bidder": "0x3d5241b179e5776146c954b4e19113d921495fd0",
+      "amount": "5000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56046037",
+      "txHash": "0xdb87c641dffb889cf0f8569429e74bb653c84b4c018f8acaee903c14a38f963e",
+      "timestamp": 1794399583
+    },
+    {
+      "bidder": "0xdc153ee06e5112633a5d4ef4f61ff045ee18a512",
+      "amount": "4000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56043911",
+      "txHash": "0x0524afa20f6d23f8b9db06b0bd01f4fc98c66e18a9071944b78bd5227f3582c6",
+      "timestamp": 1794399157
+    },
+    {
+      "bidder": "0x17d9652823c8c86549762319e4e8d4f428601be1",
+      "amount": "3000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56041946",
+      "txHash": "0xd37ecd6f07fb127f936729ec03b20253a02494f9d7bcab9036b0f1d21d06c5c5",
+      "timestamp": 1794398764
+    },
+    {
+      "bidder": "0x4cea0b9e396bdadf051bebb8187e8ab26d41a3d6",
+      "amount": "2000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56041250",
+      "txHash": "0x566ecd1812c5f629a1e818fe270b4f1fb4ae6753ecc0e51254f46e1547b654ee",
+      "timestamp": 1794398625
+    },
+    {
+      "bidder": "0x3c2d71b48832e682f539733cc286f08c34e4ef54",
+      "amount": "1000000000000000",
+      "endTime": "1794657600",
+      "blockNumber": "56040184",
+      "txHash": "0x2d334c91f7e8cbbbea730e29c0059772fbae3b8322900049bda48ffe3abb5fa8",
+      "timestamp": 1794398412
+    }
+  ],
+  "description": "サンガ（SUN-GOD）。太陽神の黄金昇天記。\n\n乱世の混沌の中、ある母の胎内にひと筋の太陽（日輪）が飛び込んだ。\n貧しい農村に生まれたその子は、自らの内に宿る太陽の光を隠し持ち、巧みな知略と人の心を見抜く眼光で、泥の中から這い上がっていく。\n\n彼は知っていた。人は力ではなく、輝きにひれ伏すのだと。\n自らを「日の御子」と称し、暗闇の時代を圧倒的な黄金の光で塗り替えていった男の覚醒劇が、いまWeb3のデジタル領域で再現される。\n\nThe second lot, after Toyotomi Hideyoshi — a sun hidden in the mud, then a rise in gold.\n\n「太陽の光が射すところ、すべてが我が領域となる」",
+  "attributes": [
+    {
+      "trait_type": "Collection",
+      "value": "Bushi Collection"
+    },
+    {
+      "display_type": "number",
+      "trait_type": "Lot",
+      "value": 2,
+      "max_value": 12
+    },
+    {
+      "trait_type": "Creator",
+      "value": "NIKO24"
+    },
+    {
+      "trait_type": "Medium",
+      "value": "手描き"
+    },
+    {
+      "trait_type": "Homage",
+      "value": "豊臣秀吉"
+    },
+    {
+      "trait_type": "Attire",
+      "value": "鎧"
+    },
+    {
+      "trait_type": "Weapon",
+      "value": "瓢箪"
+    },
+    {
+      "trait_type": "Range",
+      "value": "近"
+    },
+    {
+      "trait_type": "Role",
+      "value": "先手"
+    },
+    {
+      "trait_type": "Namer",
+      "value": "@Ktaka0304Mr"
+    },
+    {
+      "trait_type": "License",
+      "value": "CC0"
+    }
+  ],
+  "endedAt": 1794659400,
+  "finalAmount": "116000000000000000"
+}

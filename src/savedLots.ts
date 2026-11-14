@@ -1,6 +1,7 @@
 /** Settled lots. Fetched on demand. No node. Add a line after each later lot settles. */
 export const SAVED_LOTS: { id: bigint; file: string }[] = [
   { id: 1n, file: "history/lot-1.json" },
+  { id: 2n, file: "history/lot-2.json" },
 ];
 
 export type SavedBid = {
