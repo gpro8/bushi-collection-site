@@ -326,6 +326,32 @@ a:hover {
   font-weight: 700;
 }
 
+.soon-cover {
+  width: 100%;
+  min-height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--art-bg);
+}
+
+.soon-mark {
+  font-size: 7rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent);
+  opacity: 0.72;
+}
+
+.soon-copy {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.soon-copy p {
+  margin: 0;
+}
+
 .side {
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   border: 1px solid var(--border);

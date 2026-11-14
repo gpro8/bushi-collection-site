@@ -23,7 +23,7 @@ import {
   arweaveToHttp,
 } from "./config";
 import { fmtCountdown, fmtJst } from "./timeJst";
-import { SAVED_LOTS, fetchSavedLot, type SavedLot } from "./savedLots";
+import { SAVED_LOTS, fetchSavedLot, savedFile, type SavedLot } from "./savedLots";
 import { initTheme, toggleTheme, type ThemeMode } from "./theme";
 
 type AuctionState = {
@@ -503,14 +503,38 @@ export default function App() {
   );
   const desc = (meta.description || "").trim();
   const viewingPast = stageLot != null;
+  const gapNext =
+    state?.settled === true &&
+    state.id > 0n &&
+    state.id < 12n &&
+    savedFile(state.id) != null;
+  const nextId = gapNext ? state.id + 1n : null;
+  const showingSoon = gapNext && !viewingPast;
   const settledFinal =
     !viewingPast && state?.settled && settledSnap?.finalAmount
       ? settledSnap.finalAmount
       : null;
-  const shownTitle = viewingPast && stageLot.name ? stageLot.name : title;
-  const shownArt = viewingPast && stageLot.image ? stageLot.image : artUrl;
-  const shownAttrs = viewingPast ? stageLot.attributes || [] : attrs;
-  const shownDesc = viewingPast ? (stageLot.description || "").trim() : desc;
+  const shownTitle = viewingPast && stageLot.name
+    ? stageLot.name
+    : showingSoon
+      ? "まもなく"
+      : title;
+  const shownArt =
+    viewingPast && stageLot.image
+      ? stageLot.image
+      : showingSoon
+        ? ""
+        : artUrl;
+  const shownAttrs = viewingPast
+    ? stageLot.attributes || []
+    : showingSoon
+      ? []
+      : attrs;
+  const shownDesc = viewingPast
+    ? (stageLot.description || "").trim()
+    : showingSoon
+      ? ""
+      : desc;
   const { preview: descPreview, hasMore: descHasMore } = useMemo(
     () => splitDescription(shownDesc),
     [shownDesc]
@@ -521,10 +545,11 @@ export default function App() {
   const liveId = state?.id ?? 0n;
   const stageOrder = useMemo(() => {
     const ids = SAVED_LOTS.map((s) => s.id);
-    if (liveId > 0n && !ids.some((id) => id === liveId)) ids.push(liveId);
+    if (nextId && !ids.some((id) => id === nextId)) ids.push(nextId);
+    else if (liveId > 0n && !ids.some((id) => id === liveId)) ids.push(liveId);
     return ids.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  }, [liveId]);
-  const viewedId = stageLot ? BigInt(stageLot.id) : liveId;
+  }, [liveId, nextId]);
+  const viewedId = stageLot ? BigInt(stageLot.id) : nextId ?? liveId;
   const viewedIdx = stageOrder.findIndex((id) => id === viewedId);
   const prevStageId = viewedIdx > 0 ? stageOrder[viewedIdx - 1] : null;
   const nextStageId =
@@ -533,7 +558,12 @@ export default function App() {
       : null;
   const showStageId = useCallback(
     async (id: bigint) => {
-      if (id === liveId) {
+      if (nextId && id === nextId) {
+        setStageLot(null);
+        setBidHistoryOpen(false);
+        return;
+      }
+      if (id === liveId && !savedFile(id)) {
         setStageLot(null);
         setBidHistoryOpen(false);
         return;
@@ -547,7 +577,7 @@ export default function App() {
         setStatus("記録の読み込みに失敗しました");
       }
     },
-    [liveId]
+    [liveId, nextId]
   );
   const pendingAmt = (pending as bigint | undefined) ?? 0n;
   // New lot only when none active (never started or already settled)
@@ -648,7 +678,11 @@ export default function App() {
 
       <main className="hero">
         <section className="art-panel">
-          {shownArt && !artBroken ? (
+          {showingSoon ? (
+            <div className="soon-cover" role="img" aria-label="次の作品はまだありません">
+              <span className="soon-mark">?</span>
+            </div>
+          ) : shownArt && !artBroken ? (
             <img
               src={shownArt}
               alt={shownTitle}
@@ -675,7 +709,7 @@ export default function App() {
         </section>
 
         {/* Mobile: properties under artwork */}
-        {attrs.length > 0 && (
+        {shownAttrs.length > 0 && (
           <details className="props-acc props-mobile">
             <summary>プロパティ</summary>
             {TraitsGrid}
@@ -694,9 +728,11 @@ export default function App() {
               ‹
             </button>
             <p className="eyebrow">
-              {viewingPast
-                ? "落札済み"
-                : state?.live
+              {showingSoon
+                ? "次の出品"
+                : viewingPast
+                  ? "落札済み"
+                  : state?.live
                   ? "ライブオークション"
                   : state?.settled
                     ? "落札済み"
@@ -719,13 +755,19 @@ export default function App() {
             </button>
           </div>
           <p className="lot-label">
-            {viewingPast
-              ? `Bushi Collection · #${stageLot.id}`
-              : lotLabel}
+            {showingSoon
+              ? `Bushi Collection · #${nextId?.toString()}`
+              : viewingPast
+                ? `Bushi Collection · #${stageLot.id}`
+                : lotLabel}
           </p>
           <h1>{shownTitle}</h1>
           {viewingPast && (
-            <p className="stage-note">この表示はこの端末だけです · 入札は › で現在のロットへ</p>
+            <p className="stage-note">
+              {gapNext
+                ? "この表示はこの端末だけです · › で次の出品へ"
+                : "この表示はこの端末だけです · 入札は › で現在のロットへ"}
+            </p>
           )}
 
           {viewingPast ? (
@@ -737,8 +779,9 @@ export default function App() {
                 </strong>
               </div>
             </div>
-          ) : (
-            state && state.startTime > 0n && (
+          ) : !showingSoon &&
+            state &&
+            state.startTime > 0n && (
               <div className="time-jst-block">
                 <div>
                   <span className="time-jst-label">開始</span>{" "}
@@ -750,7 +793,7 @@ export default function App() {
                 </div>
               </div>
             )
-          )}
+          }
 
           {shownDesc && (
             <div className="meta-desc">
@@ -767,6 +810,12 @@ export default function App() {
             </div>
           )}
 
+          {showingSoon ? (
+            <div className="soon-copy">
+              <p>作品と開始時刻は、出品が載ってから。</p>
+              <p className="stage-note">‹ でこれまでの作品。</p>
+            </div>
+          ) : (
           <div className="stat-block">
             <div className="stat-label">
               {viewingPast || settledFinal ? "最終入札額" : "現在の入札額"}
@@ -794,6 +843,20 @@ export default function App() {
                   ? `最終入札者 ${shortAddr(settledSnap?.bids[0]?.bidder)}`
                   : `最高入札者 ${shortAddr(state?.highestBidder)}`}
             </div>
+            {viewingPast && (
+              <div className="lot-actions">
+                <button
+                  type="button"
+                  className="bid-history-btn"
+                  onClick={() => setBidHistoryOpen(true)}
+                >
+                  <span className="bid-history-ico" aria-hidden>
+                    ≡
+                  </span>
+                  入札履歴
+                </button>
+              </div>
+            )}
             {state && state.id > 0n && !viewingPast && (
               <div className="lot-actions">
                 <button
@@ -843,8 +906,9 @@ export default function App() {
               </div>
             )}
           </div>
+          )}
 
-          {!viewingPast && (
+          {!viewingPast && !showingSoon && (
           <div className="stat-block">
             <div className="stat-label">
               {state?.settled
@@ -879,7 +943,7 @@ export default function App() {
             </p>
           )}
 
-          {!viewingPast && (
+          {!viewingPast && !showingSoon && (
           <div className="bridge-help">
             <div className="bridge-help-title">入札の前に · Base 上の ETH</div>
             <p>
@@ -961,7 +1025,7 @@ export default function App() {
           )}
 
           {/* Desktop: properties accordion in side rail */}
-          {attrs.length > 0 && (
+          {shownAttrs.length > 0 && (
             <details className="props-acc props-desktop">
               <summary>プロパティ</summary>
               {TraitsGrid}
@@ -1011,7 +1075,7 @@ export default function App() {
             </p>
           )}
 
-          {!viewingPast && (
+          {!viewingPast && !showingSoon && (
           <dl className="details">
             <div>
               <dt>minted</dt>
@@ -1039,6 +1103,7 @@ export default function App() {
 
       <BidHistoryModal
         currentAuctionId={state?.id ?? 0n}
+        focusId={viewingPast && stageLot ? BigInt(stageLot.id) : undefined}
         currentTokenURI={state?.tokenURI}
         currentTitle={meta.name || title}
         currentImage={artUrl || undefined}

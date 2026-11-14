@@ -448,6 +448,7 @@ async function resolveLotMeta(tokenURI: string): Promise<{
 
 type Props = {
   currentAuctionId: bigint;
+  focusId?: bigint;
   currentTokenURI?: string;
   currentTitle?: string;
   currentImage?: string;
@@ -460,6 +461,7 @@ type Props = {
 
 export function BidHistoryModal({
   currentAuctionId,
+  focusId,
   currentTokenURI,
   currentTitle,
   currentImage,
@@ -498,8 +500,8 @@ export function BidHistoryModal({
   }, [open]);
 
   useEffect(() => {
-    if (open) setViewId(currentAuctionId);
-  }, [open, currentAuctionId]);
+    if (open) setViewId(focusId ?? currentAuctionId);
+  }, [open, currentAuctionId, focusId]);
 
   useEffect(() => {
     if (!open) return;
