@@ -611,7 +611,7 @@ export default function App() {
           />
           <div>
             <div className="brand-name">Bushi Collection</div>
-            <div className="brand-sub">{NETWORK_LABEL} · せり上げ</div>
+            <div className="brand-sub">{NETWORK_LABEL} · English Auction</div>
           </div>
         </div>
         <nav className="nav">
@@ -1123,7 +1123,7 @@ export default function App() {
       <section className="about">
         <h2>これはなに？</h2>
         <p>
-          <strong>Bushi Collection</strong> は Base 上のせり上げです。1点ずつ作品が並び、最高入札者が settle 後に NFT
+          <strong>Bushi Collection</strong> は Base 上の競り上げ方式のオークションです。1点ずつ作品が並び、最高入札者が settle 後に NFT
           を受け取ります。落札額は、すべて絵師へ（賢契約に固定）。
           開始と終了は、このページの時計どおり。
         </p>
