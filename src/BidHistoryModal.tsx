@@ -746,7 +746,7 @@ export function BidHistoryModal({
                 aria-label="このロットをこの端末に表示"
               >
                 {meta.image ? (
-                  <img src={meta.image} alt="" className="modal-thumb" />
+                  <img src={meta.image} alt="" className="modal-thumb" loading="lazy" decoding="async" />
                 ) : (
                   <div className="modal-thumb placeholder">武</div>
                 )}
@@ -755,7 +755,7 @@ export function BidHistoryModal({
             ) : (
               <>
                 {meta.image ? (
-                  <img src={meta.image} alt="" className="modal-thumb" />
+                  <img src={meta.image} alt="" className="modal-thumb" loading="lazy" decoding="async" />
                 ) : (
                   <div className="modal-thumb placeholder">武</div>
                 )}

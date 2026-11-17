@@ -690,6 +690,7 @@ export default function App() {
               src={shownArt}
               alt={shownTitle}
               className="art"
+              decoding="async"
               onError={() => {
                 if (!viewingPast) setArtBroken(true);
               }}
