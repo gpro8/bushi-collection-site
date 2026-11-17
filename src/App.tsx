@@ -99,7 +99,7 @@ function buildAuctionShare(opts: {
       lines.push(`落札 Ξ ${opts.bidEth}`);
     }
     if (opts.endJst) lines.push(`終了 ${opts.endJst}`);
-    lines.push("次の作品はサイトで");
+    lines.push("次の作品を乞うご期待ください");
     lines.push(url);
     return lines.join("\n");
   }
