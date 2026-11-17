@@ -1125,7 +1125,7 @@ export default function App() {
         <p>
           <strong>Bushi Collection</strong> は Base 上の English
           オークションです。1点ずつ作品が並び、最高入札者が settle 後に NFT
-          を受け取ります。売上はクリエイターへ 100%（ロット作成時に固定）。
+          を受け取ります。落札額は、すべて絵師へ（賢契約に固定）。
           開始と終了は、このページの時計どおり。
         </p>
         <p>
@@ -1147,7 +1147,7 @@ export default function App() {
             <li>標準期間 3 日 · 終了間際は <strong>+6 分加算</strong>（アンチスナイプ）</li>
             <li>更新入札で前の入札者の ETH は<strong>預託</strong>に · 差分だけの追加入札 or 引出</li>
             <li>終了後、誰でも <code>settle</code> 可能 → ミント + 支払い</li>
-            <li>売上はクリエイターへ 100%</li>
+            <li>落札額は、すべて絵師へ</li>
             <li>落札キャラクターは武鑑に表示</li>
           </ul>
         </details>
